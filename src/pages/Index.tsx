@@ -280,6 +280,7 @@ const Index = () => {
     const confirmed = recipients.filter((person) => acked.includes(person.name)).length;
     const unresolved = recipients.length - confirmed + (failureModes.smsUnavailable ? 1 : 0) + (failureModes.meshLoss > 40 ? 1 : 0);
     const outcome: DrillOutcome = unresolved === 0 ? "Passed" : unresolved <= 2 ? "Degraded" : "Failed";
+    const exportValid = screenshots.length > 0 && timeline.length > 0 && recipients.length > 0;
     const run: DrillRun = {
       id: `RUN-${String(drillRuns.length + 1).padStart(2, "0")}`,
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
@@ -290,6 +291,11 @@ const Index = () => {
       smsUnavailable: failureModes.smsUnavailable,
       meshLoss: failureModes.meshLoss,
       delayedAcks: failureModes.delayedAcks,
+      ackDelaySeconds: failureModes.ackDelaySeconds,
+      networkProfile,
+      evidenceCount: screenshots.length,
+      notes: evidenceNotes,
+      exportValid,
     };
     setDrillRuns((current) => [run, ...current].slice(0, 6));
     setTimeline((current) => [`${run.id} saved as ${outcome}: ${unresolved} unresolved`, ...current].slice(0, 8));
