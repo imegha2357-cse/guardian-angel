@@ -10,20 +10,27 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDot,
+  Clock3,
+  CloudOff,
   Flame,
   Gauge,
+  LocateFixed,
+  MessageCircle,
   type LucideIcon,
   MapPin,
   MessageSquareWarning,
   Mic,
+  Route,
   PhoneCall,
   RadioTower,
   RotateCcw,
   Satellite,
+  Send,
   ShieldAlert,
   ShieldCheck,
   Siren,
   Smartphone,
+  UserCheck,
   Users,
   Volume2,
   Waves,
@@ -39,6 +46,8 @@ import { cn } from "@/lib/utils";
 
 type Role = "Command" | "Security" | "Medical" | "Management";
 type IncidentStatus = "Active" | "Verifying" | "Contained";
+type AckStatus = "confirmed" | "failed" | "pending";
+type Channel = "App" | "SMS" | "Call" | "Mesh";
 
 const incidents = [
   {
@@ -94,6 +103,22 @@ const zones = [
   { name: "Cafe", x: "44%", y: "48%", state: "watch" },
   { name: "Deck B2", x: "76%", y: "70%", state: "medical" },
 ];
+
+const recipients = [
+  { name: "Security-02", role: "Security", channel: "App" as Channel, status: "confirmed" as AckStatus },
+  { name: "Medic-01", role: "Medical", channel: "SMS" as Channel, status: "confirmed" as AckStatus },
+  { name: "Floor Lead-3", role: "Warden", channel: "App" as Channel, status: "pending" as AckStatus },
+  { name: "Manager-01", role: "Management", channel: "Call" as Channel, status: "failed" as AckStatus },
+  { name: "Emergency-Dispatch", role: "External", channel: "Mesh" as Channel, status: "pending" as AckStatus },
+];
+
+const geozones = [
+  { name: "Lobby Atrium", audience: "Guests + Security", route: "Exit B via Stairwell B", blocked: "Entrance X" },
+  { name: "Service Corridor", audience: "Facilities + Fire Marshal", route: "Loading Bay C", blocked: "Elevators" },
+  { name: "Parking Deck B2", audience: "Medical + Security", route: "Ramp East", blocked: "North lift" },
+];
+
+const staffRoster = ["Security-02", "Medic-01", "Floor Lead-3", "Manager-01", "Fire Marshal-04", "Facilities-07"];
 
 const architecture = [
   ["MVP Live", "Sensor confidence scoring", "Working"],
