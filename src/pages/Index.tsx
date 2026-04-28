@@ -190,22 +190,41 @@ const Index = () => {
   ]);
   const [timelineIndex, setTimelineIndex] = useState(3);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("All");
+  const [drillFilter, setDrillFilter] = useState<DrillFilter>("All");
+  const [failureModes, setFailureModes] = useState<FailureModes>({ smsUnavailable: false, meshLoss: 12, delayedAcks: false });
+  const [networkProfile, setNetworkProfile] = useState("Normal");
+  const [drillRuns, setDrillRuns] = useState<DrillRun[]>([]);
+  const [screenshots, setScreenshots] = useState<string[]>([]);
   const [systemMessage, setSystemMessage] = useState("Hybrid communications stable. AI rules fallback armed.");
 
   const confidence = useMemo(() => Math.round(selectedIncident.confidence * 100), [selectedIncident]);
   const visibleTimeline = useMemo(() => timeline.slice(0, timelineIndex), [timeline, timelineIndex]);
   const filteredStaff = useMemo(() => staffRoster.filter((person) => roleFilter === "All" || person.role === roleFilter), [roleFilter]);
+  const simulatedComms = useMemo(() => comms.map((item) => {
+    if (item.label === "SMS" && failureModes.smsUnavailable) return { ...item, status: "Unavailable in drill", value: 0 };
+    if (item.label === "Bluetooth Mesh") return { ...item, status: `${100 - failureModes.meshLoss}% packets delivered`, value: Math.max(0, item.value - failureModes.meshLoss) };
+    if (item.label === "Internet" && networkProfile === "Offline") return { ...item, status: "Forced offline", value: 0 };
+    if (networkProfile === "Congested") return { ...item, status: "Congested route", value: Math.max(12, item.value - 28) };
+    return item;
+  }), [failureModes, networkProfile]);
   const drillResults = useMemo(() => {
     const confirmed = recipients.filter((person) => acked.includes(person.name)).length;
-    const failed = recipients.filter((person) => person.status === "failed" && !acked.includes(person.name)).length;
+    const smsImpacted = failureModes.smsUnavailable ? recipients.filter((person) => person.channel === "SMS" && !acked.includes(person.name)).length : 0;
+    const delayedImpacted = failureModes.delayedAcks ? recipients.filter((person) => !acked.includes(person.name)).length : 0;
+    const meshImpacted = failureModes.meshLoss >= 40 ? recipients.filter((person) => person.channel === "Mesh" && !acked.includes(person.name)).length : 0;
+    const failed = recipients.filter((person) => person.status === "failed" && !acked.includes(person.name)).length + smsImpacted + meshImpacted;
     const pending = recipients.length - confirmed - failed;
     return [
       { label: "Recipients confirmed", value: `${confirmed}/${recipients.length}`, state: confirmed >= 4 ? "success" : "warning" },
       { label: "Fallback channels reached", value: `${Math.min(ackRound, 4)}/4`, state: ackRound >= 3 ? "success" : "warning" },
       { label: "Offline routing", value: offlineDrill ? "Passed" : "Standby", state: offlineDrill ? "success" : "warning" },
       { label: "Unresolved failures", value: `${failed + pending}`, state: failed + pending === 0 ? "success" : "danger" },
+      { label: "SMS availability", value: failureModes.smsUnavailable ? "Blocked" : "Ready", state: failureModes.smsUnavailable ? "danger" : "success" },
+      { label: "Mesh delivery", value: `${100 - failureModes.meshLoss}%`, state: failureModes.meshLoss > 35 ? "danger" : failureModes.meshLoss > 15 ? "warning" : "success" },
+      { label: "Ack latency", value: failureModes.delayedAcks ? `+${delayedImpacted * 20}s` : "Nominal", state: failureModes.delayedAcks ? "warning" : "success" },
     ];
-  }, [ackRound, acked, offlineDrill]);
+  }, [ackRound, acked, failureModes, offlineDrill]);
+  const filteredDrillRuns = useMemo(() => drillRuns.filter((run) => drillFilter === "All" || run.outcome === drillFilter), [drillFilter, drillRuns]);
 
   const triggerDrill = () => {
     setSimulation(true);
