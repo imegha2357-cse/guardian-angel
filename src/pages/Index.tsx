@@ -567,9 +567,19 @@ const Index = () => {
                     <span>Delayed acknowledgments</span>
                     <Switch checked={failureModes.delayedAcks} onCheckedChange={(checked) => setFailureModes((current) => ({ ...current, delayedAcks: checked }))} />
                   </div>
+                  <div className="rounded-md border border-border bg-surface/70 p-3">
+                    <div className="mb-2 flex justify-between"><span>Ack delay timeline</span><span>{failureModes.ackDelaySeconds}s</span></div>
+                    <input aria-label="Acknowledgment delay seconds" type="range" min="0" max="120" step="5" value={failureModes.ackDelaySeconds} onChange={(event) => setFailureModes((current) => ({ ...current, ackDelaySeconds: Number(event.target.value), delayedAcks: Number(event.target.value) > 0 }))} className="w-full accent-primary" />
+                    <Button variant="console" size="sm" className="mt-2 h-8 w-full text-xs" onClick={addDelayTimeline}><Clock3 /> Add delay event</Button>
+                  </div>
                   <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-surface/70 p-1 text-xs">
                     {["Normal", "Congested", "Offline"].map((profile) => (
                       <button key={profile} onClick={() => setNetworkProfile(profile)} className={cn("rounded-md px-2 py-1", networkProfile === profile ? "bg-primary text-primary-foreground" : "bg-surface-strong text-muted-foreground")}>{profile}</button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-surface/70 p-1 text-xs">
+                    {drillPresets.map((preset) => (
+                      <button key={preset.name} onClick={() => applyPreset(preset)} className="rounded-md bg-surface-strong px-2 py-1 text-muted-foreground hover:bg-primary hover:text-primary-foreground">{preset.name}</button>
                     ))}
                   </div>
                 </div>
@@ -617,6 +627,8 @@ const Index = () => {
                   <Button variant="command" size="sm" onClick={exportDrillReport}><FileDown /> PDF report</Button>
                   <Button variant="console" size="sm" onClick={exportCsv} disabled={!drillRuns.length}><FileDown /> CSV export</Button>
                 </div>
+                <textarea aria-label="Evidence upload notes" value={evidenceNotes} onChange={(event) => setEvidenceNotes(event.target.value)} placeholder="Evidence notes" className="mt-3 min-h-16 w-full rounded-md border border-border bg-surface/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                <Button variant="console" size="sm" className="mt-2 w-full" onClick={validateExports}>Validate export consistency</Button>
                 <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
                   <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
                   {drillFilters.map((item) => (
@@ -626,10 +638,15 @@ const Index = () => {
                   ))}
                 </div>
                 <div className="mt-2 space-y-2">
+                  {filteredDrillRuns.length > 1 && (
+                    <div className="rounded-md border border-primary/30 bg-primary/10 p-2 text-xs text-primary">
+                      Compare: {filteredDrillRuns[0].id} vs {filteredDrillRuns[1].id} • unresolved Δ {filteredDrillRuns[0].unresolved - filteredDrillRuns[1].unresolved} • delay Δ {filteredDrillRuns[0].ackDelaySeconds - filteredDrillRuns[1].ackDelaySeconds}s
+                    </div>
+                  )}
                   {filteredDrillRuns.map((run) => (
                     <div key={run.id} className="rounded-md border border-border bg-surface/70 p-2 text-xs">
                       <div className="flex justify-between font-semibold"><span>{run.id} • {run.time}</span><span className={cn(run.outcome === "Passed" && "text-success", run.outcome === "Degraded" && "text-warning", run.outcome === "Failed" && "text-danger")}>{run.outcome}</span></div>
-                      <p className="mt-1 text-muted-foreground">Ack {run.confirmed}/{recipients.length} • unresolved {run.unresolved} • mesh loss {run.meshLoss}%</p>
+                      <p className="mt-1 text-muted-foreground">Ack {run.confirmed}/{recipients.length} • unresolved {run.unresolved} • {run.networkProfile} • delay {run.ackDelaySeconds}s • evidence {run.evidenceCount}</p>
                     </div>
                   ))}
                   {!filteredDrillRuns.length && <p className="rounded-md bg-surface/70 p-2 text-xs text-muted-foreground">No saved runs match this filter.</p>}
