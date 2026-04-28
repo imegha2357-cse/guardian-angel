@@ -143,18 +143,48 @@ const Index = () => {
   const [silentMode, setSilentMode] = useState(true);
   const [simulation, setSimulation] = useState(false);
   const [acked, setAcked] = useState<string[]>(["Security-02", "Medic-01"]);
+  const [ackRound, setAckRound] = useState(1);
+  const [offlineDrill, setOfflineDrill] = useState(false);
+  const [activeGeozone, setActiveGeozone] = useState(geozones[0]);
+  const [assignedStaff, setAssignedStaff] = useState<string[]>(["Security-02", "Medic-01"]);
+  const [timeline, setTimeline] = useState([
+    "00:00 Impact + microphone anomaly detected",
+    "00:08 Fusion confidence crossed response threshold",
+    "00:15 Geo-broadcast limited to Lobby Atrium",
+  ]);
   const [systemMessage, setSystemMessage] = useState("Hybrid communications stable. AI rules fallback armed.");
 
   const confidence = useMemo(() => Math.round(selectedIncident.confidence * 100), [selectedIncident]);
 
   const triggerDrill = () => {
     setSimulation(true);
+    setTimeline((current) => ["DRILL Offline failure drill armed", ...current].slice(0, 6));
     setSystemMessage("Simulation drill started: alarms muted for guests, staff routing enabled.");
   };
 
   const escalate = () => {
+    setAckRound((current) => Math.min(current + 1, 4));
+    setTimeline((current) => [`${new Date().toLocaleTimeString([], { minute: "2-digit", second: "2-digit" })} Priority retry escalated`, ...current].slice(0, 6));
     setSystemMessage("Escalation sent via app alert, SMS fallback, repeated call attempts, and geo-broadcast.");
     setAcked((current) => Array.from(new Set([...current, "Emergency-Dispatch", "Manager-01"])));
+  };
+
+  const acknowledgeAll = () => {
+    setAcked(recipients.map((person) => person.name));
+    setTimeline((current) => ["ACK All recipients confirmed or supervisor-overridden", ...current].slice(0, 6));
+    setSystemMessage("Acknowledgment simulator completed: unresolved recipients escalated to supervisor override.");
+  };
+
+  const toggleStaff = (person: string) => {
+    setAssignedStaff((current) => current.includes(person) ? current.filter((item) => item !== person) : [...current, person]);
+    setSystemMessage(`${person} assignment updated for ${selectedIncident.id}.`);
+  };
+
+  const runOfflineDrill = () => {
+    setOfflineDrill((current) => !current);
+    setAckRound(3);
+    setTimeline((current) => ["FAILOVER Internet offline → SMS → call loop → mesh relay", ...current].slice(0, 6));
+    setSystemMessage("Offline failure drill running: primary internet blocked, fallback retries escalated by priority.");
   };
 
   const cancelAlert = () => {
