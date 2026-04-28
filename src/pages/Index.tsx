@@ -16,6 +16,7 @@ import {
   Filter,
   Flame,
   Gauge,
+  ImageDown,
   LocateFixed,
   MessageCircle,
   type LucideIcon,
@@ -32,6 +33,7 @@ import {
   ShieldCheck,
   Siren,
   Smartphone,
+  SlidersHorizontal,
   UserCheck,
   Users,
   Volume2,
@@ -52,6 +54,26 @@ type AckStatus = "confirmed" | "failed" | "pending";
 type Channel = "App" | "SMS" | "Call" | "Mesh";
 type StaffRole = Role | "Warden" | "External" | "Facilities" | "Fire";
 type RoleFilter = StaffRole | "All";
+type DrillOutcome = "Passed" | "Degraded" | "Failed";
+type DrillFilter = DrillOutcome | "All";
+
+type FailureModes = {
+  smsUnavailable: boolean;
+  meshLoss: number;
+  delayedAcks: boolean;
+};
+
+type DrillRun = {
+  id: string;
+  time: string;
+  outcome: DrillOutcome;
+  confirmed: number;
+  unresolved: number;
+  fallbackReach: number;
+  smsUnavailable: boolean;
+  meshLoss: number;
+  delayedAcks: boolean;
+};
 
 const incidents = [
   {
@@ -132,6 +154,7 @@ const staffRoster = [
 ];
 
 const roleFilters: RoleFilter[] = ["All", "Security", "Medical", "Warden", "Management", "Facilities", "Fire"];
+const drillFilters: DrillFilter[] = ["All", "Passed", "Degraded", "Failed"];
 
 const architecture = [
   ["MVP Live", "Sensor confidence scoring", "Working"],
@@ -167,22 +190,41 @@ const Index = () => {
   ]);
   const [timelineIndex, setTimelineIndex] = useState(3);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("All");
+  const [drillFilter, setDrillFilter] = useState<DrillFilter>("All");
+  const [failureModes, setFailureModes] = useState<FailureModes>({ smsUnavailable: false, meshLoss: 12, delayedAcks: false });
+  const [networkProfile, setNetworkProfile] = useState("Normal");
+  const [drillRuns, setDrillRuns] = useState<DrillRun[]>([]);
+  const [screenshots, setScreenshots] = useState<string[]>([]);
   const [systemMessage, setSystemMessage] = useState("Hybrid communications stable. AI rules fallback armed.");
 
   const confidence = useMemo(() => Math.round(selectedIncident.confidence * 100), [selectedIncident]);
   const visibleTimeline = useMemo(() => timeline.slice(0, timelineIndex), [timeline, timelineIndex]);
   const filteredStaff = useMemo(() => staffRoster.filter((person) => roleFilter === "All" || person.role === roleFilter), [roleFilter]);
+  const simulatedComms = useMemo(() => comms.map((item) => {
+    if (item.label === "SMS" && failureModes.smsUnavailable) return { ...item, status: "Unavailable in drill", value: 0 };
+    if (item.label === "Bluetooth Mesh") return { ...item, status: `${100 - failureModes.meshLoss}% packets delivered`, value: Math.max(0, item.value - failureModes.meshLoss) };
+    if (item.label === "Internet" && networkProfile === "Offline") return { ...item, status: "Forced offline", value: 0 };
+    if (networkProfile === "Congested") return { ...item, status: "Congested route", value: Math.max(12, item.value - 28) };
+    return item;
+  }), [failureModes, networkProfile]);
   const drillResults = useMemo(() => {
     const confirmed = recipients.filter((person) => acked.includes(person.name)).length;
-    const failed = recipients.filter((person) => person.status === "failed" && !acked.includes(person.name)).length;
+    const smsImpacted = failureModes.smsUnavailable ? recipients.filter((person) => person.channel === "SMS" && !acked.includes(person.name)).length : 0;
+    const delayedImpacted = failureModes.delayedAcks ? recipients.filter((person) => !acked.includes(person.name)).length : 0;
+    const meshImpacted = failureModes.meshLoss >= 40 ? recipients.filter((person) => person.channel === "Mesh" && !acked.includes(person.name)).length : 0;
+    const failed = recipients.filter((person) => person.status === "failed" && !acked.includes(person.name)).length + smsImpacted + meshImpacted;
     const pending = recipients.length - confirmed - failed;
     return [
       { label: "Recipients confirmed", value: `${confirmed}/${recipients.length}`, state: confirmed >= 4 ? "success" : "warning" },
       { label: "Fallback channels reached", value: `${Math.min(ackRound, 4)}/4`, state: ackRound >= 3 ? "success" : "warning" },
       { label: "Offline routing", value: offlineDrill ? "Passed" : "Standby", state: offlineDrill ? "success" : "warning" },
       { label: "Unresolved failures", value: `${failed + pending}`, state: failed + pending === 0 ? "success" : "danger" },
+      { label: "SMS availability", value: failureModes.smsUnavailable ? "Blocked" : "Ready", state: failureModes.smsUnavailable ? "danger" : "success" },
+      { label: "Mesh delivery", value: `${100 - failureModes.meshLoss}%`, state: failureModes.meshLoss > 35 ? "danger" : failureModes.meshLoss > 15 ? "warning" : "success" },
+      { label: "Ack latency", value: failureModes.delayedAcks ? `+${delayedImpacted * 20}s` : "Nominal", state: failureModes.delayedAcks ? "warning" : "success" },
     ];
-  }, [ackRound, acked, offlineDrill]);
+  }, [ackRound, acked, failureModes, offlineDrill]);
+  const filteredDrillRuns = useMemo(() => drillRuns.filter((run) => drillFilter === "All" || run.outcome === drillFilter), [drillFilter, drillRuns]);
 
   const triggerDrill = () => {
     setSimulation(true);
@@ -214,11 +256,52 @@ const Index = () => {
     setTimelineIndex((current) => Math.min(current + 1, 8));
   };
 
+  const captureScreenshot = () => {
+    const stamp = `CAP-${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+    setScreenshots((current) => [stamp, ...current].slice(0, 4));
+    setTimeline((current) => [`${stamp} dashboard evidence captured`, ...current].slice(0, 8));
+    setSystemMessage("Dashboard screenshot marker captured for the drill report evidence log.");
+  };
+
+  const saveDrillRun = () => {
+    const confirmed = recipients.filter((person) => acked.includes(person.name)).length;
+    const unresolved = recipients.length - confirmed + (failureModes.smsUnavailable ? 1 : 0) + (failureModes.meshLoss > 40 ? 1 : 0);
+    const outcome: DrillOutcome = unresolved === 0 ? "Passed" : unresolved <= 2 ? "Degraded" : "Failed";
+    const run: DrillRun = {
+      id: `RUN-${String(drillRuns.length + 1).padStart(2, "0")}`,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      outcome,
+      confirmed,
+      unresolved,
+      fallbackReach: Math.min(ackRound, 4),
+      smsUnavailable: failureModes.smsUnavailable,
+      meshLoss: failureModes.meshLoss,
+      delayedAcks: failureModes.delayedAcks,
+    };
+    setDrillRuns((current) => [run, ...current].slice(0, 6));
+    setTimeline((current) => [`${run.id} saved as ${outcome}: ${unresolved} unresolved`, ...current].slice(0, 8));
+    setSystemMessage(`${run.id} saved. Outcome: ${outcome}. Compare it against filtered drill runs.`);
+  };
+
+  const exportCsv = () => {
+    const header = ["Run", "Time", "Outcome", "Confirmed", "Unresolved", "FallbackReach", "SMSUnavailable", "MeshLoss", "DelayedAcks"];
+    const body = drillRuns.map((run) => [run.id, run.time, run.outcome, run.confirmed, run.unresolved, run.fallbackReach, run.smsUnavailable, run.meshLoss, run.delayedAcks].join(","));
+    const csv = [header.join(","), ...body].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "crisisnet-drill-runs.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+    setSystemMessage("CSV export downloaded with saved drill run comparisons.");
+  };
+
   const exportDrillReport = () => {
     const rows = recipients.map((person) => `${person.name} — ${person.role} — ${acked.includes(person.name) ? "confirmed" : person.status === "failed" ? "failed" : "pending"} via ${person.channel}`).join("<br />");
+    const modes = `Network: ${networkProfile}<br/>SMS unavailable: ${failureModes.smsUnavailable ? "Yes" : "No"}<br/>Mesh packet loss: ${failureModes.meshLoss}%<br/>Delayed acks: ${failureModes.delayedAcks ? "Yes" : "No"}<br/>Screenshots: ${screenshots.join(", ") || "None"}`;
     const report = window.open("", "_blank", "width=760,height=900");
     if (!report) return;
-    report.document.write(`<html><head><title>CrisisNet Drill Report</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111827}h1{margin:0 0 8px}.meta{color:#4b5563;margin-bottom:24px}.card{border:1px solid #d1d5db;border-radius:8px;padding:14px;margin:12px 0}.ok{color:#047857}.warn{color:#b45309}.bad{color:#b91c1c}@media print{button{display:none}}</style></head><body><h1>CrisisNet Offline Drill Report</h1><div class="meta">${selectedIncident.id} • ${selectedIncident.zone} • ${new Date().toLocaleString()}</div><h2>Results</h2>${drillResults.map((item) => `<div class="card"><strong>${item.label}</strong><br/><span class="${item.state === "success" ? "ok" : item.state === "danger" ? "bad" : "warn"}">${item.value}</span></div>`).join("")}<h2>Recipient acknowledgments</h2><div class="card">${rows}</div><h2>Timeline</h2><div class="card">${timeline.join("<br />")}</div><button onclick="window.print()">Export as PDF</button><script>setTimeout(() => window.print(), 300)</script></body></html>`);
+    report.document.write(`<html><head><title>CrisisNet Drill Report</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111827}h1{margin:0 0 8px}.meta{color:#4b5563;margin-bottom:24px}.card{border:1px solid #d1d5db;border-radius:8px;padding:14px;margin:12px 0}.ok{color:#047857}.warn{color:#b45309}.bad{color:#b91c1c}@media print{button{display:none}}</style></head><body><h1>CrisisNet Offline Drill Report</h1><div class="meta">${selectedIncident.id} • ${selectedIncident.zone} • ${new Date().toLocaleString()}</div><h2>Results</h2>${drillResults.map((item) => `<div class="card"><strong>${item.label}</strong><br/><span class="${item.state === "success" ? "ok" : item.state === "danger" ? "bad" : "warn"}">${item.value}</span></div>`).join("")}<h2>Failure modes + evidence</h2><div class="card">${modes}</div><h2>Recipient acknowledgments</h2><div class="card">${rows}</div><h2>Timeline</h2><div class="card">${timeline.join("<br />")}</div><button onclick="window.print()">Export as PDF</button><script>setTimeout(() => window.print(), 300)</script></body></html>`);
     report.document.close();
     setSystemMessage("Drill report prepared in a print-ready PDF export window.");
   };
@@ -416,7 +499,7 @@ const Index = () => {
             <aside className="space-y-4">
               <Panel title="Hybrid Communications" icon={RadioTower}>
                 <div className="space-y-3">
-                  {comms.map((item) => (
+                  {simulatedComms.map((item) => (
                     <div key={item.label} className="rounded-lg border border-border bg-surface/70 p-3">
                       <div className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-2 font-semibold"><item.icon className="h-4 w-4 text-primary" /> {item.label}</span>
@@ -426,6 +509,28 @@ const Index = () => {
                       <p className="mt-2 text-xs text-muted-foreground">{item.status}</p>
                     </div>
                   ))}
+                </div>
+              </Panel>
+
+              <Panel title="Failure Mode Controls" icon={SlidersHorizontal}>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between rounded-md border border-border bg-surface/70 p-3">
+                    <span>SMS unavailable</span>
+                    <Switch checked={failureModes.smsUnavailable} onCheckedChange={(checked) => setFailureModes((current) => ({ ...current, smsUnavailable: checked }))} />
+                  </div>
+                  <div className="rounded-md border border-border bg-surface/70 p-3">
+                    <div className="mb-2 flex justify-between"><span>Mesh packet loss</span><span>{failureModes.meshLoss}%</span></div>
+                    <input aria-label="Mesh packet loss rate" type="range" min="0" max="80" value={failureModes.meshLoss} onChange={(event) => setFailureModes((current) => ({ ...current, meshLoss: Number(event.target.value) }))} className="w-full accent-primary" />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border bg-surface/70 p-3">
+                    <span>Delayed acknowledgments</span>
+                    <Switch checked={failureModes.delayedAcks} onCheckedChange={(checked) => setFailureModes((current) => ({ ...current, delayedAcks: checked }))} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-surface/70 p-1 text-xs">
+                    {["Normal", "Congested", "Offline"].map((profile) => (
+                      <button key={profile} onClick={() => setNetworkProfile(profile)} className={cn("rounded-md px-2 py-1", networkProfile === profile ? "bg-primary text-primary-foreground" : "bg-surface-strong text-muted-foreground")}>{profile}</button>
+                    ))}
+                  </div>
                 </div>
               </Panel>
 
@@ -465,7 +570,29 @@ const Index = () => {
                     </div>
                   ))}
                 </div>
-                <Button variant="command" size="sm" className="mt-3 w-full" onClick={exportDrillReport}><FileDown /> Export PDF report</Button>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button variant="console" size="sm" onClick={captureScreenshot}><ImageDown /> Screenshot</Button>
+                  <Button variant="console" size="sm" onClick={saveDrillRun}><BadgeCheck /> Save run</Button>
+                  <Button variant="command" size="sm" onClick={exportDrillReport}><FileDown /> PDF report</Button>
+                  <Button variant="console" size="sm" onClick={exportCsv} disabled={!drillRuns.length}><FileDown /> CSV export</Button>
+                </div>
+                <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
+                  <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  {drillFilters.map((item) => (
+                    <Button key={item} variant={drillFilter === item ? "command" : "console"} size="sm" onClick={() => setDrillFilter(item)} className="h-8 shrink-0 px-2 text-xs">
+                      {item}
+                    </Button>
+                  ))}
+                </div>
+                <div className="mt-2 space-y-2">
+                  {filteredDrillRuns.map((run) => (
+                    <div key={run.id} className="rounded-md border border-border bg-surface/70 p-2 text-xs">
+                      <div className="flex justify-between font-semibold"><span>{run.id} • {run.time}</span><span className={cn(run.outcome === "Passed" && "text-success", run.outcome === "Degraded" && "text-warning", run.outcome === "Failed" && "text-danger")}>{run.outcome}</span></div>
+                      <p className="mt-1 text-muted-foreground">Ack {run.confirmed}/{recipients.length} • unresolved {run.unresolved} • mesh loss {run.meshLoss}%</p>
+                    </div>
+                  ))}
+                  {!filteredDrillRuns.length && <p className="rounded-md bg-surface/70 p-2 text-xs text-muted-foreground">No saved runs match this filter.</p>}
+                </div>
               </Panel>
 
               <Panel title="Incident Timeline" icon={Clock3}>
