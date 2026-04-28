@@ -12,6 +12,8 @@ import {
   CircleDot,
   Clock3,
   CloudOff,
+  FileDown,
+  Filter,
   Flame,
   Gauge,
   LocateFixed,
@@ -48,6 +50,8 @@ type Role = "Command" | "Security" | "Medical" | "Management";
 type IncidentStatus = "Active" | "Verifying" | "Contained";
 type AckStatus = "confirmed" | "failed" | "pending";
 type Channel = "App" | "SMS" | "Call" | "Mesh";
+type StaffRole = Role | "Warden" | "External" | "Facilities" | "Fire";
+type RoleFilter = StaffRole | "All";
 
 const incidents = [
   {
@@ -98,18 +102,18 @@ const comms = [
 ];
 
 const zones = [
-  { name: "Atrium", x: "18%", y: "23%", state: "danger" },
-  { name: "Stair B", x: "68%", y: "18%", state: "safe" },
-  { name: "Cafe", x: "44%", y: "48%", state: "watch" },
-  { name: "Deck B2", x: "76%", y: "70%", state: "medical" },
+  { name: "Atrium", x: "18%", y: "23%", state: "danger", coverage: 96, devices: 42 },
+  { name: "Stair B", x: "68%", y: "18%", state: "safe", coverage: 88, devices: 21 },
+  { name: "Cafe", x: "44%", y: "48%", state: "watch", coverage: 72, devices: 18 },
+  { name: "Deck B2", x: "76%", y: "70%", state: "medical", coverage: 61, devices: 14 },
 ];
 
 const recipients = [
-  { name: "Security-02", role: "Security", channel: "App" as Channel, status: "confirmed" as AckStatus },
-  { name: "Medic-01", role: "Medical", channel: "SMS" as Channel, status: "confirmed" as AckStatus },
-  { name: "Floor Lead-3", role: "Warden", channel: "App" as Channel, status: "pending" as AckStatus },
-  { name: "Manager-01", role: "Management", channel: "Call" as Channel, status: "failed" as AckStatus },
-  { name: "Emergency-Dispatch", role: "External", channel: "Mesh" as Channel, status: "pending" as AckStatus },
+  { name: "Security-02", role: "Security" as StaffRole, zone: "Lobby Atrium", channel: "App" as Channel, status: "confirmed" as AckStatus },
+  { name: "Medic-01", role: "Medical" as StaffRole, zone: "Parking Deck B2", channel: "SMS" as Channel, status: "confirmed" as AckStatus },
+  { name: "Floor Lead-3", role: "Warden" as StaffRole, zone: "Cafe", channel: "App" as Channel, status: "pending" as AckStatus },
+  { name: "Manager-01", role: "Management" as StaffRole, zone: "Command", channel: "Call" as Channel, status: "failed" as AckStatus },
+  { name: "Emergency-Dispatch", role: "External" as StaffRole, zone: "City relay", channel: "Mesh" as Channel, status: "pending" as AckStatus },
 ];
 
 const geozones = [
@@ -118,7 +122,16 @@ const geozones = [
   { name: "Parking Deck B2", audience: "Medical + Security", route: "Ramp East", blocked: "North lift" },
 ];
 
-const staffRoster = ["Security-02", "Medic-01", "Floor Lead-3", "Manager-01", "Fire Marshal-04", "Facilities-07"];
+const staffRoster = [
+  { name: "Security-02", role: "Security" as StaffRole },
+  { name: "Medic-01", role: "Medical" as StaffRole },
+  { name: "Floor Lead-3", role: "Warden" as StaffRole },
+  { name: "Manager-01", role: "Management" as StaffRole },
+  { name: "Fire Marshal-04", role: "Fire" as StaffRole },
+  { name: "Facilities-07", role: "Facilities" as StaffRole },
+];
+
+const roleFilters: RoleFilter[] = ["All", "Security", "Medical", "Warden", "Management", "Facilities", "Fire"];
 
 const architecture = [
   ["MVP Live", "Sensor confidence scoring", "Working"],
