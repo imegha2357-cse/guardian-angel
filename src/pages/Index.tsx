@@ -203,10 +203,11 @@ const Index = () => {
   const [timelineIndex, setTimelineIndex] = useState(3);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("All");
   const [drillFilter, setDrillFilter] = useState<DrillFilter>("All");
-  const [failureModes, setFailureModes] = useState<FailureModes>({ smsUnavailable: false, meshLoss: 12, delayedAcks: false });
+  const [failureModes, setFailureModes] = useState<FailureModes>({ smsUnavailable: false, meshLoss: 12, delayedAcks: false, ackDelaySeconds: 0 });
   const [networkProfile, setNetworkProfile] = useState("Normal");
   const [drillRuns, setDrillRuns] = useState<DrillRun[]>([]);
   const [screenshots, setScreenshots] = useState<string[]>([]);
+  const [evidenceNotes, setEvidenceNotes] = useState("");
   const [systemMessage, setSystemMessage] = useState("Hybrid communications stable. AI rules fallback armed.");
 
   const confidence = useMemo(() => Math.round(selectedIncident.confidence * 100), [selectedIncident]);
@@ -233,7 +234,7 @@ const Index = () => {
       { label: "Unresolved failures", value: `${failed + pending}`, state: failed + pending === 0 ? "success" : "danger" },
       { label: "SMS availability", value: failureModes.smsUnavailable ? "Blocked" : "Ready", state: failureModes.smsUnavailable ? "danger" : "success" },
       { label: "Mesh delivery", value: `${100 - failureModes.meshLoss}%`, state: failureModes.meshLoss > 35 ? "danger" : failureModes.meshLoss > 15 ? "warning" : "success" },
-      { label: "Ack latency", value: failureModes.delayedAcks ? `+${delayedImpacted * 20}s` : "Nominal", state: failureModes.delayedAcks ? "warning" : "success" },
+      { label: "Ack latency", value: failureModes.delayedAcks ? `+${failureModes.ackDelaySeconds || delayedImpacted * 20}s` : "Nominal", state: failureModes.delayedAcks ? "warning" : "success" },
     ];
   }, [ackRound, acked, failureModes, offlineDrill]);
   const filteredDrillRuns = useMemo(() => drillRuns.filter((run) => drillFilter === "All" || run.outcome === drillFilter), [drillFilter, drillRuns]);
