@@ -302,11 +302,19 @@ const Index = () => {
               </Panel>
 
               <Panel title="Staff Assignment" icon={UserCheck}>
+                <div className="mb-3 flex items-center gap-2 overflow-x-auto pb-1">
+                  <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  {roleFilters.map((item) => (
+                    <Button key={item} variant={roleFilter === item ? "command" : "console"} size="sm" onClick={() => setRoleFilter(item)} className="h-8 shrink-0 px-2 text-xs">
+                      {item}
+                    </Button>
+                  ))}
+                </div>
                 <div className="space-y-2">
-                  {staffRoster.map((person) => (
-                    <button key={person} onClick={() => toggleStaff(person)} className={cn("flex w-full items-center justify-between rounded-md border p-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-ring", assignedStaff.includes(person) ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface/70 hover:border-primary/60")}>
-                      <span>{person}</span>
-                      <span className="text-xs text-muted-foreground">{assignedStaff.includes(person) ? "Assigned" : "Standby"}</span>
+                  {filteredStaff.map((person) => (
+                    <button key={person.name} onClick={() => toggleStaff(person.name)} className={cn("flex w-full items-center justify-between rounded-md border p-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-ring", assignedStaff.includes(person.name) ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface/70 hover:border-primary/60")}>
+                      <span>{person.name}</span>
+                      <span className="text-xs text-muted-foreground">{person.role} • {assignedStaff.includes(person.name) ? "Assigned" : "Standby"}</span>
                     </button>
                   ))}
                 </div>
