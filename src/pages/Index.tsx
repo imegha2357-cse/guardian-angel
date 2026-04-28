@@ -265,8 +265,24 @@ const Index = () => {
 
   const acknowledgeRecipient = (person: string) => {
     setAcked((current) => current.includes(person) ? current.filter((item) => item !== person) : [...current, person]);
-    setTimeline((current) => [`ACK ${person} status updated`, ...current].slice(0, 8));
+    const delay = failureModes.delayedAcks ? ` delayed +${failureModes.ackDelaySeconds}s` : "";
+    setTimeline((current) => [`ACK ${person} status updated${delay}`, ...current].slice(0, 8));
     setTimelineIndex((current) => Math.min(current + 1, 8));
+  };
+
+  const applyPreset = (preset: typeof drillPresets[number]) => {
+    setFailureModes(preset.modes);
+    setNetworkProfile(preset.profile);
+    setTimeline((current) => [`PRESET ${preset.name}: ${preset.profile}, ${preset.modes.meshLoss}% mesh loss`, ...current].slice(0, 8));
+    setSystemMessage(`${preset.name} preset loaded for offline drill simulation.`);
+  };
+
+  const addDelayTimeline = () => {
+    const delay = failureModes.delayedAcks ? failureModes.ackDelaySeconds : 30;
+    setFailureModes((current) => ({ ...current, delayedAcks: true, ackDelaySeconds: delay }));
+    setTimeline((current) => [`T+${delay}s delayed acknowledgment window injected`, ...current].slice(0, 8));
+    setTimelineIndex((current) => Math.min(current + 1, 8));
+    setSystemMessage(`Timeline delay injected: acknowledgments now lag by ${delay} seconds.`);
   };
 
   const captureScreenshot = () => {
@@ -303,8 +319,8 @@ const Index = () => {
   };
 
   const exportCsv = () => {
-    const header = ["Run", "Time", "Outcome", "Confirmed", "Unresolved", "FallbackReach", "SMSUnavailable", "MeshLoss", "DelayedAcks"];
-    const body = drillRuns.map((run) => [run.id, run.time, run.outcome, run.confirmed, run.unresolved, run.fallbackReach, run.smsUnavailable, run.meshLoss, run.delayedAcks].join(","));
+    const header = ["Run", "Time", "Outcome", "Confirmed", "Unresolved", "FallbackReach", "Network", "SMSUnavailable", "MeshLoss", "DelayedAcks", "AckDelaySeconds", "EvidenceCount", "ExportValid", "Notes"];
+    const body = drillRuns.map((run) => [run.id, run.time, run.outcome, run.confirmed, run.unresolved, run.fallbackReach, run.networkProfile, run.smsUnavailable, run.meshLoss, run.delayedAcks, run.ackDelaySeconds, run.evidenceCount, run.exportValid, `"${run.notes.replace(/"/g, '""')}"`].join(","));
     const csv = [header.join(","), ...body].join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
@@ -315,9 +331,15 @@ const Index = () => {
     setSystemMessage("CSV export downloaded with saved drill run comparisons.");
   };
 
+  const validateExports = () => {
+    const invalid = drillRuns.filter((run) => !run.exportValid).length;
+    const columnsMatch = drillRuns.every((run) => typeof run.networkProfile === "string" && typeof run.evidenceCount === "number" && typeof run.exportValid === "boolean");
+    setSystemMessage(invalid === 0 && columnsMatch ? "Export consistency validated: saved runs include matching CSV/PDF fields and evidence metadata." : `Export validation flagged ${invalid} run(s) missing evidence or timeline metadata.`);
+  };
+
   const exportDrillReport = () => {
     const rows = recipients.map((person) => `${person.name} — ${person.role} — ${acked.includes(person.name) ? "confirmed" : person.status === "failed" ? "failed" : "pending"} via ${person.channel}`).join("<br />");
-    const modes = `Network: ${networkProfile}<br/>SMS unavailable: ${failureModes.smsUnavailable ? "Yes" : "No"}<br/>Mesh packet loss: ${failureModes.meshLoss}%<br/>Delayed acks: ${failureModes.delayedAcks ? "Yes" : "No"}<br/>Screenshots: ${screenshots.join(", ") || "None"}`;
+    const modes = `Network: ${networkProfile}<br/>SMS unavailable: ${failureModes.smsUnavailable ? "Yes" : "No"}<br/>Mesh packet loss: ${failureModes.meshLoss}%<br/>Delayed acks: ${failureModes.delayedAcks ? `Yes, +${failureModes.ackDelaySeconds}s` : "No"}<br/>Screenshots: ${screenshots.join(", ") || "None"}<br/>Notes: ${evidenceNotes || "None"}`;
     const report = window.open("", "_blank", "width=760,height=900");
     if (!report) return;
     report.document.write(`<html><head><title>CrisisNet Drill Report</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111827}h1{margin:0 0 8px}.meta{color:#4b5563;margin-bottom:24px}.card{border:1px solid #d1d5db;border-radius:8px;padding:14px;margin:12px 0}.ok{color:#047857}.warn{color:#b45309}.bad{color:#b91c1c}@media print{button{display:none}}</style></head><body><h1>CrisisNet Offline Drill Report</h1><div class="meta">${selectedIncident.id} • ${selectedIncident.zone} • ${new Date().toLocaleString()}</div><h2>Results</h2>${drillResults.map((item) => `<div class="card"><strong>${item.label}</strong><br/><span class="${item.state === "success" ? "ok" : item.state === "danger" ? "bad" : "warn"}">${item.value}</span></div>`).join("")}<h2>Failure modes + evidence</h2><div class="card">${modes}</div><h2>Recipient acknowledgments</h2><div class="card">${rows}</div><h2>Timeline</h2><div class="card">${timeline.join("<br />")}</div><button onclick="window.print()">Export as PDF</button><script>setTimeout(() => window.print(), 300)</script></body></html>`);
