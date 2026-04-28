@@ -12,6 +12,8 @@ import {
   CircleDot,
   Clock3,
   CloudOff,
+  FileDown,
+  Filter,
   Flame,
   Gauge,
   LocateFixed,
@@ -48,6 +50,8 @@ type Role = "Command" | "Security" | "Medical" | "Management";
 type IncidentStatus = "Active" | "Verifying" | "Contained";
 type AckStatus = "confirmed" | "failed" | "pending";
 type Channel = "App" | "SMS" | "Call" | "Mesh";
+type StaffRole = Role | "Warden" | "External" | "Facilities" | "Fire";
+type RoleFilter = StaffRole | "All";
 
 const incidents = [
   {
@@ -98,18 +102,18 @@ const comms = [
 ];
 
 const zones = [
-  { name: "Atrium", x: "18%", y: "23%", state: "danger" },
-  { name: "Stair B", x: "68%", y: "18%", state: "safe" },
-  { name: "Cafe", x: "44%", y: "48%", state: "watch" },
-  { name: "Deck B2", x: "76%", y: "70%", state: "medical" },
+  { name: "Atrium", x: "18%", y: "23%", state: "danger", coverage: 96, devices: 42 },
+  { name: "Stair B", x: "68%", y: "18%", state: "safe", coverage: 88, devices: 21 },
+  { name: "Cafe", x: "44%", y: "48%", state: "watch", coverage: 72, devices: 18 },
+  { name: "Deck B2", x: "76%", y: "70%", state: "medical", coverage: 61, devices: 14 },
 ];
 
 const recipients = [
-  { name: "Security-02", role: "Security", channel: "App" as Channel, status: "confirmed" as AckStatus },
-  { name: "Medic-01", role: "Medical", channel: "SMS" as Channel, status: "confirmed" as AckStatus },
-  { name: "Floor Lead-3", role: "Warden", channel: "App" as Channel, status: "pending" as AckStatus },
-  { name: "Manager-01", role: "Management", channel: "Call" as Channel, status: "failed" as AckStatus },
-  { name: "Emergency-Dispatch", role: "External", channel: "Mesh" as Channel, status: "pending" as AckStatus },
+  { name: "Security-02", role: "Security" as StaffRole, zone: "Lobby Atrium", channel: "App" as Channel, status: "confirmed" as AckStatus },
+  { name: "Medic-01", role: "Medical" as StaffRole, zone: "Parking Deck B2", channel: "SMS" as Channel, status: "confirmed" as AckStatus },
+  { name: "Floor Lead-3", role: "Warden" as StaffRole, zone: "Cafe", channel: "App" as Channel, status: "pending" as AckStatus },
+  { name: "Manager-01", role: "Management" as StaffRole, zone: "Command", channel: "Call" as Channel, status: "failed" as AckStatus },
+  { name: "Emergency-Dispatch", role: "External" as StaffRole, zone: "City relay", channel: "Mesh" as Channel, status: "pending" as AckStatus },
 ];
 
 const geozones = [
@@ -118,7 +122,16 @@ const geozones = [
   { name: "Parking Deck B2", audience: "Medical + Security", route: "Ramp East", blocked: "North lift" },
 ];
 
-const staffRoster = ["Security-02", "Medic-01", "Floor Lead-3", "Manager-01", "Fire Marshal-04", "Facilities-07"];
+const staffRoster = [
+  { name: "Security-02", role: "Security" as StaffRole },
+  { name: "Medic-01", role: "Medical" as StaffRole },
+  { name: "Floor Lead-3", role: "Warden" as StaffRole },
+  { name: "Manager-01", role: "Management" as StaffRole },
+  { name: "Fire Marshal-04", role: "Fire" as StaffRole },
+  { name: "Facilities-07", role: "Facilities" as StaffRole },
+];
+
+const roleFilters: RoleFilter[] = ["All", "Security", "Medical", "Warden", "Management", "Facilities", "Fire"];
 
 const architecture = [
   ["MVP Live", "Sensor confidence scoring", "Working"],
@@ -152,9 +165,24 @@ const Index = () => {
     "00:08 Fusion confidence crossed response threshold",
     "00:15 Geo-broadcast limited to Lobby Atrium",
   ]);
+  const [timelineIndex, setTimelineIndex] = useState(3);
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("All");
   const [systemMessage, setSystemMessage] = useState("Hybrid communications stable. AI rules fallback armed.");
 
   const confidence = useMemo(() => Math.round(selectedIncident.confidence * 100), [selectedIncident]);
+  const visibleTimeline = useMemo(() => timeline.slice(0, timelineIndex), [timeline, timelineIndex]);
+  const filteredStaff = useMemo(() => staffRoster.filter((person) => roleFilter === "All" || person.role === roleFilter), [roleFilter]);
+  const drillResults = useMemo(() => {
+    const confirmed = recipients.filter((person) => acked.includes(person.name)).length;
+    const failed = recipients.filter((person) => person.status === "failed" && !acked.includes(person.name)).length;
+    const pending = recipients.length - confirmed - failed;
+    return [
+      { label: "Recipients confirmed", value: `${confirmed}/${recipients.length}`, state: confirmed >= 4 ? "success" : "warning" },
+      { label: "Fallback channels reached", value: `${Math.min(ackRound, 4)}/4`, state: ackRound >= 3 ? "success" : "warning" },
+      { label: "Offline routing", value: offlineDrill ? "Passed" : "Standby", state: offlineDrill ? "success" : "warning" },
+      { label: "Unresolved failures", value: `${failed + pending}`, state: failed + pending === 0 ? "success" : "danger" },
+    ];
+  }, [ackRound, acked, offlineDrill]);
 
   const triggerDrill = () => {
     setSimulation(true);
@@ -178,6 +206,21 @@ const Index = () => {
   const toggleStaff = (person: string) => {
     setAssignedStaff((current) => current.includes(person) ? current.filter((item) => item !== person) : [...current, person]);
     setSystemMessage(`${person} assignment updated for ${selectedIncident.id}.`);
+  };
+
+  const acknowledgeRecipient = (person: string) => {
+    setAcked((current) => current.includes(person) ? current.filter((item) => item !== person) : [...current, person]);
+    setTimeline((current) => [`ACK ${person} status updated`, ...current].slice(0, 8));
+    setTimelineIndex((current) => Math.min(current + 1, 8));
+  };
+
+  const exportDrillReport = () => {
+    const rows = recipients.map((person) => `${person.name} — ${person.role} — ${acked.includes(person.name) ? "confirmed" : person.status === "failed" ? "failed" : "pending"} via ${person.channel}`).join("<br />");
+    const report = window.open("", "_blank", "width=760,height=900");
+    if (!report) return;
+    report.document.write(`<html><head><title>CrisisNet Drill Report</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111827}h1{margin:0 0 8px}.meta{color:#4b5563;margin-bottom:24px}.card{border:1px solid #d1d5db;border-radius:8px;padding:14px;margin:12px 0}.ok{color:#047857}.warn{color:#b45309}.bad{color:#b91c1c}@media print{button{display:none}}</style></head><body><h1>CrisisNet Offline Drill Report</h1><div class="meta">${selectedIncident.id} • ${selectedIncident.zone} • ${new Date().toLocaleString()}</div><h2>Results</h2>${drillResults.map((item) => `<div class="card"><strong>${item.label}</strong><br/><span class="${item.state === "success" ? "ok" : item.state === "danger" ? "bad" : "warn"}">${item.value}</span></div>`).join("")}<h2>Recipient acknowledgments</h2><div class="card">${rows}</div><h2>Timeline</h2><div class="card">${timeline.join("<br />")}</div><button onclick="window.print()">Export as PDF</button><script>setTimeout(() => window.print(), 300)</script></body></html>`);
+    report.document.close();
+    setSystemMessage("Drill report prepared in a print-ready PDF export window.");
   };
 
   const runOfflineDrill = () => {
@@ -259,11 +302,19 @@ const Index = () => {
               </Panel>
 
               <Panel title="Staff Assignment" icon={UserCheck}>
+                <div className="mb-3 flex items-center gap-2 overflow-x-auto pb-1">
+                  <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  {roleFilters.map((item) => (
+                    <Button key={item} variant={roleFilter === item ? "command" : "console"} size="sm" onClick={() => setRoleFilter(item)} className="h-8 shrink-0 px-2 text-xs">
+                      {item}
+                    </Button>
+                  ))}
+                </div>
                 <div className="space-y-2">
-                  {staffRoster.map((person) => (
-                    <button key={person} onClick={() => toggleStaff(person)} className={cn("flex w-full items-center justify-between rounded-md border p-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-ring", assignedStaff.includes(person) ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface/70 hover:border-primary/60")}>
-                      <span>{person}</span>
-                      <span className="text-xs text-muted-foreground">{assignedStaff.includes(person) ? "Assigned" : "Standby"}</span>
+                  {filteredStaff.map((person) => (
+                    <button key={person.name} onClick={() => toggleStaff(person.name)} className={cn("flex w-full items-center justify-between rounded-md border p-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-ring", assignedStaff.includes(person.name) ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface/70 hover:border-primary/60")}>
+                      <span>{person.name}</span>
+                      <span className="text-xs text-muted-foreground">{person.role} • {assignedStaff.includes(person.name) ? "Assigned" : "Standby"}</span>
                     </button>
                   ))}
                 </div>
@@ -296,6 +347,15 @@ const Index = () => {
                         {zone.name}
                       </button>
                     ))}
+                    <div className="absolute bottom-6 left-6 w-56 rounded-lg border border-border bg-background/90 p-3 backdrop-blur">
+                      <p className="mb-2 text-xs uppercase text-muted-foreground">Zone coverage</p>
+                      {zones.map((zone) => (
+                        <div key={zone.name} className="mb-2 last:mb-0">
+                          <div className="flex justify-between text-xs"><span>{zone.name}</span><span>{zone.coverage}% • {zone.devices}</span></div>
+                          <Progress value={zone.coverage} className="mt-1 h-1.5" />
+                        </div>
+                      ))}
+                    </div>
                     <div className="absolute left-8 top-8 rounded-lg border border-border bg-background/90 p-3 backdrop-blur">
                       <p className="text-xs uppercase text-muted-foreground">Dynamic route</p>
                       <p className="font-display text-xl font-semibold">Avoid Atrium → Stairwell B</p>
@@ -386,6 +446,9 @@ const Index = () => {
                           {confirmed ? <CheckCircle2 className="h-4 w-4 text-success" /> : failed ? <CloudOff className="h-4 w-4 text-danger" /> : <Clock3 className="h-4 w-4 text-warning" />}
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">{person.role} • {confirmed ? "Confirmed" : failed ? "Failed" : "Retry pending"} via {person.channel}</p>
+                        <Button variant={confirmed ? "command" : "console"} size="sm" className="mt-2 h-8 w-full text-xs" onClick={() => acknowledgeRecipient(person.name)}>
+                          {confirmed ? "Reopen ack" : "Acknowledge recipient"}
+                        </Button>
                       </div>
                     );
                   })}
@@ -393,9 +456,30 @@ const Index = () => {
                 <Button variant="console" size="sm" className="mt-3 w-full" onClick={acknowledgeAll}><Send /> Run acknowledge simulator</Button>
               </Panel>
 
+              <Panel title="Drill Results" icon={FileDown}>
+                <div className="grid grid-cols-2 gap-2">
+                  {drillResults.map((item) => (
+                    <div key={item.label} className="rounded-md border border-border bg-surface-strong/70 p-2">
+                      <p className="text-xs text-muted-foreground">{item.label}</p>
+                      <p className={cn("font-display text-lg font-semibold", item.state === "success" && "text-success", item.state === "warning" && "text-warning", item.state === "danger" && "text-danger")}>{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="command" size="sm" className="mt-3 w-full" onClick={exportDrillReport}><FileDown /> Export PDF report</Button>
+              </Panel>
+
               <Panel title="Incident Timeline" icon={Clock3}>
+                <input
+                  aria-label="Timeline scrubber"
+                  type="range"
+                  min="1"
+                  max={timeline.length}
+                  value={timelineIndex}
+                  onChange={(event) => setTimelineIndex(Number(event.target.value))}
+                  className="mb-3 w-full accent-primary"
+                />
                 <div className="space-y-2">
-                  {timeline.map((event) => (
+                  {visibleTimeline.map((event) => (
                     <div key={event} className="flex gap-2 rounded-md bg-surface/70 p-2 text-sm">
                       <CircleDot className="mt-1 h-3 w-3 shrink-0 text-primary" />
                       <span>{event}</span>
