@@ -499,7 +499,7 @@ const Index = () => {
             <aside className="space-y-4">
               <Panel title="Hybrid Communications" icon={RadioTower}>
                 <div className="space-y-3">
-                  {comms.map((item) => (
+                  {simulatedComms.map((item) => (
                     <div key={item.label} className="rounded-lg border border-border bg-surface/70 p-3">
                       <div className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-2 font-semibold"><item.icon className="h-4 w-4 text-primary" /> {item.label}</span>
@@ -509,6 +509,28 @@ const Index = () => {
                       <p className="mt-2 text-xs text-muted-foreground">{item.status}</p>
                     </div>
                   ))}
+                </div>
+              </Panel>
+
+              <Panel title="Failure Mode Controls" icon={SlidersHorizontal}>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between rounded-md border border-border bg-surface/70 p-3">
+                    <span>SMS unavailable</span>
+                    <Switch checked={failureModes.smsUnavailable} onCheckedChange={(checked) => setFailureModes((current) => ({ ...current, smsUnavailable: checked }))} />
+                  </div>
+                  <div className="rounded-md border border-border bg-surface/70 p-3">
+                    <div className="mb-2 flex justify-between"><span>Mesh packet loss</span><span>{failureModes.meshLoss}%</span></div>
+                    <input aria-label="Mesh packet loss rate" type="range" min="0" max="80" value={failureModes.meshLoss} onChange={(event) => setFailureModes((current) => ({ ...current, meshLoss: Number(event.target.value) }))} className="w-full accent-primary" />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border bg-surface/70 p-3">
+                    <span>Delayed acknowledgments</span>
+                    <Switch checked={failureModes.delayedAcks} onCheckedChange={(checked) => setFailureModes((current) => ({ ...current, delayedAcks: checked }))} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-surface/70 p-1 text-xs">
+                    {["Normal", "Congested", "Offline"].map((profile) => (
+                      <button key={profile} onClick={() => setNetworkProfile(profile)} className={cn("rounded-md px-2 py-1", networkProfile === profile ? "bg-primary text-primary-foreground" : "bg-surface-strong text-muted-foreground")}>{profile}</button>
+                    ))}
+                  </div>
                 </div>
               </Panel>
 
