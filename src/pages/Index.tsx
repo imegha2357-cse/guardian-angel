@@ -1,8 +1,7 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import {
   Activity,
   AlarmClock,
-  Ambulance,
   BadgeCheck,
   BellRing,
   Bluetooth,
@@ -13,11 +12,10 @@ import {
   CircleDot,
   Flame,
   Gauge,
-  HeartPulse,
+  type LucideIcon,
   MapPin,
   MessageSquareWarning,
   Mic,
-  Navigation,
   PhoneCall,
   RadioTower,
   RotateCcw,
@@ -334,7 +332,7 @@ const Index = () => {
   );
 };
 
-const Panel = ({ title, icon: Icon, className, children }: { title: string; icon: typeof ShieldAlert; className?: string; children: React.ReactNode }) => (
+const Panel = ({ title, icon: Icon, className, children }: { title: string; icon: LucideIcon; className?: string; children: ReactNode }) => (
   <section className={cn("rounded-xl border border-border bg-card/78 p-4 shadow-command backdrop-blur-xl", className)}>
     <div className="mb-4 flex items-center gap-2">
       <span className="rounded-md bg-primary/10 p-2 text-primary"><Icon className="h-4 w-4" /></span>
@@ -348,7 +346,7 @@ const StatusPill = ({ status }: { status: IncidentStatus }) => (
   <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", status === "Active" && "bg-danger text-destructive-foreground", status === "Verifying" && "bg-warning text-accent-foreground", status === "Contained" && "bg-success text-primary-foreground")}>{status}</span>
 );
 
-const ActionTile = ({ icon: Icon, title, onClick }: { icon: typeof Flame; title: string; onClick: () => void }) => (
+const ActionTile = ({ icon: Icon, title, onClick }: { icon: LucideIcon; title: string; onClick: () => void }) => (
   <button onClick={onClick} className="rounded-lg border border-border bg-surface/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/60 hover:bg-surface-strong focus:outline-none focus:ring-2 focus:ring-ring">
     <Icon className="mb-3 h-5 w-5 text-accent" />
     <p className="font-display font-semibold">{title}</p>
