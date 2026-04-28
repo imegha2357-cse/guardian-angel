@@ -257,6 +257,17 @@ const Index = () => {
                   ))}
                 </div>
               </Panel>
+
+              <Panel title="Staff Assignment" icon={UserCheck}>
+                <div className="space-y-2">
+                  {staffRoster.map((person) => (
+                    <button key={person} onClick={() => toggleStaff(person)} className={cn("flex w-full items-center justify-between rounded-md border p-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-ring", assignedStaff.includes(person) ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface/70 hover:border-primary/60")}>
+                      <span>{person}</span>
+                      <span className="text-xs text-muted-foreground">{assignedStaff.includes(person) ? "Assigned" : "Standby"}</span>
+                    </button>
+                  ))}
+                </div>
+              </Panel>
             </aside>
 
             <section className="space-y-5">
@@ -325,12 +336,19 @@ const Index = () => {
                   <ActionTile icon={MessageSquareWarning} title="Voice check" onClick={() => setSystemMessage("Voice assistant asking: Are you safe? Offline keyword detection active.")} />
                   <ActionTile icon={PhoneCall} title="Call loop" onClick={() => setSystemMessage("Repeated call attempts started with SMS and app alert backup.")} />
                 </div>
-                <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border bg-surface/70 p-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="font-display text-lg font-semibold">Silent distress mode</p>
-                    <p className="text-sm text-muted-foreground">Confirms distress without visible alarm for harassment or violence scenarios.</p>
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface/70 p-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-display text-lg font-semibold">Silent distress mode</p>
+                      <p className="text-sm text-muted-foreground">Confirms distress without visible alarm for harassment or violence scenarios.</p>
+                    </div>
+                    <Switch checked={silentMode} onCheckedChange={setSilentMode} />
                   </div>
-                  <Switch checked={silentMode} onCheckedChange={setSilentMode} />
+                  <button onClick={runOfflineDrill} className={cn("rounded-lg border p-4 text-left transition hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring", offlineDrill ? "border-warning bg-warning/10" : "border-border bg-surface/70")}>
+                    <CloudOff className="mb-2 h-5 w-5 text-warning" />
+                    <p className="font-display text-lg font-semibold">Offline failure drills</p>
+                    <p className="text-sm text-muted-foreground">Simulates internet loss and verifies SMS, call loop, and mesh fallback escalation.</p>
+                  </button>
                 </div>
               </Panel>
             </section>
