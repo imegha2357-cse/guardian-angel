@@ -39,6 +39,18 @@ export default {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        danger: "hsl(var(--danger))",
+        info: "hsl(var(--info))",
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          strong: "hsl(var(--surface-strong))",
+        },
+        map: {
+          hazard: "hsl(var(--map-hazard))",
+          safe: "hsl(var(--map-safe))",
+        },
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -63,6 +75,19 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        display: ["Space Grotesk", "Segoe UI", "sans-serif"],
+        sans: ["IBM Plex Sans", "Segoe UI", "sans-serif"],
+      },
+      backgroundImage: {
+        "command": "var(--gradient-command)",
+        "critical": "var(--gradient-critical)",
+        "safe": "var(--gradient-safe)",
+      },
+      boxShadow: {
+        command: "var(--shadow-command)",
+        alert: "var(--shadow-alert)",
+      },
       keyframes: {
         "accordion-down": {
           from: {
@@ -80,10 +105,15 @@ export default {
             height: "0",
           },
         },
+        pulseSignal: {
+          "0%, 100%": { transform: "scale(1)", opacity: "0.65" },
+          "50%": { transform: "scale(1.18)", opacity: "0.18" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-signal": "pulseSignal 2.4s ease-in-out infinite",
       },
     },
   },
