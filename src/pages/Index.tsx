@@ -213,8 +213,8 @@ const Index = () => {
                     <div className="absolute inset-6 rounded-md border border-border bg-background/40" />
                     <div className="absolute left-[8%] top-[34%] h-20 w-[76%] rounded-md border border-border bg-surface-strong/70" />
                     <div className="absolute left-[58%] top-[12%] h-[76%] w-16 rounded-md border border-border bg-surface-strong/60" />
-                    <div className="absolute bottom-7 left-8 right-8 h-2 rounded-full bg-safe" />
-                    <div className="absolute bottom-10 right-10 rounded-full bg-safe px-3 py-1 text-xs font-semibold text-primary-foreground">Exit B</div>
+                    <div className="absolute bottom-7 left-8 right-8 h-2 rounded-full bg-map-safe" />
+                    <div className="absolute bottom-10 right-10 rounded-full bg-map-safe px-3 py-1 text-xs font-semibold text-primary-foreground">Exit B</div>
                     {zones.map((zone) => (
                       <button
                         key={zone.name}
@@ -337,7 +337,7 @@ const Index = () => {
 const Panel = ({ title, icon: Icon, className, children }: { title: string; icon: typeof ShieldAlert; className?: string; children: React.ReactNode }) => (
   <section className={cn("rounded-xl border border-border bg-card/78 p-4 shadow-command backdrop-blur-xl", className)}>
     <div className="mb-4 flex items-center gap-2">
-      <span className="rounded-md bg-primary/12 p-2 text-primary"><Icon className="h-4 w-4" /></span>
+      <span className="rounded-md bg-primary/10 p-2 text-primary"><Icon className="h-4 w-4" /></span>
       <h2 className="font-display text-lg font-semibold">{title}</h2>
     </div>
     {children}
@@ -358,7 +358,7 @@ const ActionTile = ({ icon: Icon, title, onClick }: { icon: typeof Flame; title:
 const ArchRow = ({ item }: { item: string[] }) => (
   <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface/70 p-2 text-sm">
     <span>{item[1]}</span>
-    <span className="rounded-full bg-primary/12 px-2 py-1 text-xs text-primary">{item[2]}</span>
+    <span className="rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">{item[2]}</span>
   </div>
 );
 
