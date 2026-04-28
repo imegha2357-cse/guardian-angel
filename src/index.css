@@ -8,35 +8,49 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 218 28% 7%;
+    --foreground: 197 42% 94%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 218 25% 11%;
+    --card-foreground: 197 42% 94%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 218 25% 11%;
+    --popover-foreground: 197 42% 94%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 174 86% 46%;
+    --primary-foreground: 218 28% 7%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217 21% 17%;
+    --secondary-foreground: 197 42% 94%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 217 20% 16%;
+    --muted-foreground: 200 18% 66%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 43 93% 57%;
+    --accent-foreground: 218 28% 7%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 3 86% 61%;
+    --destructive-foreground: 197 42% 94%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 196 40% 88% / 0.14;
+    --input: 196 40% 88% / 0.16;
+    --ring: 174 86% 46%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+
+    --success: 146 75% 45%;
+    --warning: 43 93% 57%;
+    --danger: 3 86% 61%;
+    --info: 202 93% 62%;
+    --surface: 218 25% 11%;
+    --surface-strong: 217 25% 15%;
+    --map-hazard: 3 86% 61%;
+    --map-safe: 146 75% 45%;
+    --gradient-command: linear-gradient(135deg, hsl(218 28% 7%) 0%, hsl(217 25% 13%) 54%, hsl(187 62% 14%) 100%);
+    --gradient-critical: linear-gradient(135deg, hsl(var(--danger)), hsl(16 91% 57%));
+    --gradient-safe: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--success)));
+    --shadow-command: 0 24px 80px -42px hsl(var(--primary) / 0.55);
+    --shadow-alert: 0 18px 52px -30px hsl(var(--danger) / 0.72);
 
     --sidebar-background: 0 0% 98%;
 
@@ -101,5 +115,37 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  }
+}
+
+@layer utilities {
+  .command-grid {
+    background-image:
+      linear-gradient(hsl(var(--foreground) / 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.045) 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
+
+  .scanline {
+    background: linear-gradient(180deg, transparent, hsl(var(--primary) / 0.16), transparent);
+    animation: scan 5.5s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scanline {
+      animation: none;
+    }
+  }
+
+  @keyframes scan {
+    0%, 100% { transform: translateY(-35%); opacity: 0.25; }
+    50% { transform: translateY(55%); opacity: 0.7; }
   }
 }
