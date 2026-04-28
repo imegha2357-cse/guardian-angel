@@ -140,7 +140,7 @@ const Index = () => {
     <main className="min-h-screen overflow-hidden bg-command text-foreground">
       <section className="relative min-h-screen command-grid">
         <div className="scanline pointer-events-none absolute inset-x-0 top-0 h-48" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.18),transparent_32%),radial-gradient(circle_at_82%_18%,hsl(var(--danger)/0.14),transparent_30%)]" />
+        <div className="command-radials absolute inset-0" />
 
         <div className="relative mx-auto flex min-h-screen w-full max-w-[1500px] flex-col gap-5 px-4 py-4 sm:px-6 lg:px-8">
           <header className="flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-center lg:justify-between">
