@@ -165,9 +165,24 @@ const Index = () => {
     "00:08 Fusion confidence crossed response threshold",
     "00:15 Geo-broadcast limited to Lobby Atrium",
   ]);
+  const [timelineIndex, setTimelineIndex] = useState(3);
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("All");
   const [systemMessage, setSystemMessage] = useState("Hybrid communications stable. AI rules fallback armed.");
 
   const confidence = useMemo(() => Math.round(selectedIncident.confidence * 100), [selectedIncident]);
+  const visibleTimeline = useMemo(() => timeline.slice(0, timelineIndex), [timeline, timelineIndex]);
+  const filteredStaff = useMemo(() => staffRoster.filter((person) => roleFilter === "All" || person.role === roleFilter), [roleFilter]);
+  const drillResults = useMemo(() => {
+    const confirmed = recipients.filter((person) => acked.includes(person.name)).length;
+    const failed = recipients.filter((person) => person.status === "failed" && !acked.includes(person.name)).length;
+    const pending = recipients.length - confirmed - failed;
+    return [
+      { label: "Recipients confirmed", value: `${confirmed}/${recipients.length}`, state: confirmed >= 4 ? "success" : "warning" },
+      { label: "Fallback channels reached", value: `${Math.min(ackRound, 4)}/4`, state: ackRound >= 3 ? "success" : "warning" },
+      { label: "Offline routing", value: offlineDrill ? "Passed" : "Standby", state: offlineDrill ? "success" : "warning" },
+      { label: "Unresolved failures", value: `${failed + pending}`, state: failed + pending === 0 ? "success" : "danger" },
+    ];
+  }, [ackRound, acked, offlineDrill]);
 
   const triggerDrill = () => {
     setSimulation(true);
@@ -191,6 +206,21 @@ const Index = () => {
   const toggleStaff = (person: string) => {
     setAssignedStaff((current) => current.includes(person) ? current.filter((item) => item !== person) : [...current, person]);
     setSystemMessage(`${person} assignment updated for ${selectedIncident.id}.`);
+  };
+
+  const acknowledgeRecipient = (person: string) => {
+    setAcked((current) => current.includes(person) ? current.filter((item) => item !== person) : [...current, person]);
+    setTimeline((current) => [`ACK ${person} status updated`, ...current].slice(0, 8));
+    setTimelineIndex((current) => Math.min(current + 1, 8));
+  };
+
+  const exportDrillReport = () => {
+    const rows = recipients.map((person) => `${person.name} — ${person.role} — ${acked.includes(person.name) ? "confirmed" : person.status === "failed" ? "failed" : "pending"} via ${person.channel}`).join("<br />");
+    const report = window.open("", "_blank", "width=760,height=900");
+    if (!report) return;
+    report.document.write(`<html><head><title>CrisisNet Drill Report</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111827}h1{margin:0 0 8px}.meta{color:#4b5563;margin-bottom:24px}.card{border:1px solid #d1d5db;border-radius:8px;padding:14px;margin:12px 0}.ok{color:#047857}.warn{color:#b45309}.bad{color:#b91c1c}@media print{button{display:none}}</style></head><body><h1>CrisisNet Offline Drill Report</h1><div class="meta">${selectedIncident.id} • ${selectedIncident.zone} • ${new Date().toLocaleString()}</div><h2>Results</h2>${drillResults.map((item) => `<div class="card"><strong>${item.label}</strong><br/><span class="${item.state === "success" ? "ok" : item.state === "danger" ? "bad" : "warn"}">${item.value}</span></div>`).join("")}<h2>Recipient acknowledgments</h2><div class="card">${rows}</div><h2>Timeline</h2><div class="card">${timeline.join("<br />")}</div><button onclick="window.print()">Export as PDF</button><script>setTimeout(() => window.print(), 300)</script></body></html>`);
+    report.document.close();
+    setSystemMessage("Drill report prepared in a print-ready PDF export window.");
   };
 
   const runOfflineDrill = () => {
