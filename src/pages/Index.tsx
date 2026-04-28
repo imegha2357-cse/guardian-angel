@@ -570,7 +570,29 @@ const Index = () => {
                     </div>
                   ))}
                 </div>
-                <Button variant="command" size="sm" className="mt-3 w-full" onClick={exportDrillReport}><FileDown /> Export PDF report</Button>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button variant="console" size="sm" onClick={captureScreenshot}><ImageDown /> Screenshot</Button>
+                  <Button variant="console" size="sm" onClick={saveDrillRun}><BadgeCheck /> Save run</Button>
+                  <Button variant="command" size="sm" onClick={exportDrillReport}><FileDown /> PDF report</Button>
+                  <Button variant="console" size="sm" onClick={exportCsv} disabled={!drillRuns.length}><FileDown /> CSV export</Button>
+                </div>
+                <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
+                  <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  {drillFilters.map((item) => (
+                    <Button key={item} variant={drillFilter === item ? "command" : "console"} size="sm" onClick={() => setDrillFilter(item)} className="h-8 shrink-0 px-2 text-xs">
+                      {item}
+                    </Button>
+                  ))}
+                </div>
+                <div className="mt-2 space-y-2">
+                  {filteredDrillRuns.map((run) => (
+                    <div key={run.id} className="rounded-md border border-border bg-surface/70 p-2 text-xs">
+                      <div className="flex justify-between font-semibold"><span>{run.id} • {run.time}</span><span className={cn(run.outcome === "Passed" && "text-success", run.outcome === "Degraded" && "text-warning", run.outcome === "Failed" && "text-danger")}>{run.outcome}</span></div>
+                      <p className="mt-1 text-muted-foreground">Ack {run.confirmed}/{recipients.length} • unresolved {run.unresolved} • mesh loss {run.meshLoss}%</p>
+                    </div>
+                  ))}
+                  {!filteredDrillRuns.length && <p className="rounded-md bg-surface/70 p-2 text-xs text-muted-foreground">No saved runs match this filter.</p>}
+                </div>
               </Panel>
 
               <Panel title="Incident Timeline" icon={Clock3}>
