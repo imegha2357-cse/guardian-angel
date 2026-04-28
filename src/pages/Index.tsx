@@ -10,20 +10,27 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDot,
+  Clock3,
+  CloudOff,
   Flame,
   Gauge,
+  LocateFixed,
+  MessageCircle,
   type LucideIcon,
   MapPin,
   MessageSquareWarning,
   Mic,
+  Route,
   PhoneCall,
   RadioTower,
   RotateCcw,
   Satellite,
+  Send,
   ShieldAlert,
   ShieldCheck,
   Siren,
   Smartphone,
+  UserCheck,
   Users,
   Volume2,
   Waves,
@@ -39,6 +46,8 @@ import { cn } from "@/lib/utils";
 
 type Role = "Command" | "Security" | "Medical" | "Management";
 type IncidentStatus = "Active" | "Verifying" | "Contained";
+type AckStatus = "confirmed" | "failed" | "pending";
+type Channel = "App" | "SMS" | "Call" | "Mesh";
 
 const incidents = [
   {
@@ -95,6 +104,22 @@ const zones = [
   { name: "Deck B2", x: "76%", y: "70%", state: "medical" },
 ];
 
+const recipients = [
+  { name: "Security-02", role: "Security", channel: "App" as Channel, status: "confirmed" as AckStatus },
+  { name: "Medic-01", role: "Medical", channel: "SMS" as Channel, status: "confirmed" as AckStatus },
+  { name: "Floor Lead-3", role: "Warden", channel: "App" as Channel, status: "pending" as AckStatus },
+  { name: "Manager-01", role: "Management", channel: "Call" as Channel, status: "failed" as AckStatus },
+  { name: "Emergency-Dispatch", role: "External", channel: "Mesh" as Channel, status: "pending" as AckStatus },
+];
+
+const geozones = [
+  { name: "Lobby Atrium", audience: "Guests + Security", route: "Exit B via Stairwell B", blocked: "Entrance X" },
+  { name: "Service Corridor", audience: "Facilities + Fire Marshal", route: "Loading Bay C", blocked: "Elevators" },
+  { name: "Parking Deck B2", audience: "Medical + Security", route: "Ramp East", blocked: "North lift" },
+];
+
+const staffRoster = ["Security-02", "Medic-01", "Floor Lead-3", "Manager-01", "Fire Marshal-04", "Facilities-07"];
+
 const architecture = [
   ["MVP Live", "Sensor confidence scoring", "Working"],
   ["MVP Live", "Multi-channel verification", "Working"],
@@ -118,18 +143,48 @@ const Index = () => {
   const [silentMode, setSilentMode] = useState(true);
   const [simulation, setSimulation] = useState(false);
   const [acked, setAcked] = useState<string[]>(["Security-02", "Medic-01"]);
+  const [ackRound, setAckRound] = useState(1);
+  const [offlineDrill, setOfflineDrill] = useState(false);
+  const [activeGeozone, setActiveGeozone] = useState(geozones[0]);
+  const [assignedStaff, setAssignedStaff] = useState<string[]>(["Security-02", "Medic-01"]);
+  const [timeline, setTimeline] = useState([
+    "00:00 Impact + microphone anomaly detected",
+    "00:08 Fusion confidence crossed response threshold",
+    "00:15 Geo-broadcast limited to Lobby Atrium",
+  ]);
   const [systemMessage, setSystemMessage] = useState("Hybrid communications stable. AI rules fallback armed.");
 
   const confidence = useMemo(() => Math.round(selectedIncident.confidence * 100), [selectedIncident]);
 
   const triggerDrill = () => {
     setSimulation(true);
+    setTimeline((current) => ["DRILL Offline failure drill armed", ...current].slice(0, 6));
     setSystemMessage("Simulation drill started: alarms muted for guests, staff routing enabled.");
   };
 
   const escalate = () => {
+    setAckRound((current) => Math.min(current + 1, 4));
+    setTimeline((current) => [`${new Date().toLocaleTimeString([], { minute: "2-digit", second: "2-digit" })} Priority retry escalated`, ...current].slice(0, 6));
     setSystemMessage("Escalation sent via app alert, SMS fallback, repeated call attempts, and geo-broadcast.");
     setAcked((current) => Array.from(new Set([...current, "Emergency-Dispatch", "Manager-01"])));
+  };
+
+  const acknowledgeAll = () => {
+    setAcked(recipients.map((person) => person.name));
+    setTimeline((current) => ["ACK All recipients confirmed or supervisor-overridden", ...current].slice(0, 6));
+    setSystemMessage("Acknowledgment simulator completed: unresolved recipients escalated to supervisor override.");
+  };
+
+  const toggleStaff = (person: string) => {
+    setAssignedStaff((current) => current.includes(person) ? current.filter((item) => item !== person) : [...current, person]);
+    setSystemMessage(`${person} assignment updated for ${selectedIncident.id}.`);
+  };
+
+  const runOfflineDrill = () => {
+    setOfflineDrill((current) => !current);
+    setAckRound(3);
+    setTimeline((current) => ["FAILOVER Internet offline → SMS → call loop → mesh relay", ...current].slice(0, 6));
+    setSystemMessage("Offline failure drill running: primary internet blocked, fallback retries escalated by priority.");
   };
 
   const cancelAlert = () => {
@@ -202,6 +257,17 @@ const Index = () => {
                   ))}
                 </div>
               </Panel>
+
+              <Panel title="Staff Assignment" icon={UserCheck}>
+                <div className="space-y-2">
+                  {staffRoster.map((person) => (
+                    <button key={person} onClick={() => toggleStaff(person)} className={cn("flex w-full items-center justify-between rounded-md border p-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-ring", assignedStaff.includes(person) ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface/70 hover:border-primary/60")}>
+                      <span>{person}</span>
+                      <span className="text-xs text-muted-foreground">{assignedStaff.includes(person) ? "Assigned" : "Standby"}</span>
+                    </button>
+                  ))}
+                </div>
+              </Panel>
             </aside>
 
             <section className="space-y-5">
@@ -270,12 +336,19 @@ const Index = () => {
                   <ActionTile icon={MessageSquareWarning} title="Voice check" onClick={() => setSystemMessage("Voice assistant asking: Are you safe? Offline keyword detection active.")} />
                   <ActionTile icon={PhoneCall} title="Call loop" onClick={() => setSystemMessage("Repeated call attempts started with SMS and app alert backup.")} />
                 </div>
-                <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border bg-surface/70 p-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="font-display text-lg font-semibold">Silent distress mode</p>
-                    <p className="text-sm text-muted-foreground">Confirms distress without visible alarm for harassment or violence scenarios.</p>
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface/70 p-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-display text-lg font-semibold">Silent distress mode</p>
+                      <p className="text-sm text-muted-foreground">Confirms distress without visible alarm for harassment or violence scenarios.</p>
+                    </div>
+                    <Switch checked={silentMode} onCheckedChange={setSilentMode} />
                   </div>
-                  <Switch checked={silentMode} onCheckedChange={setSilentMode} />
+                  <button onClick={runOfflineDrill} className={cn("rounded-lg border p-4 text-left transition hover:border-primary/60 focus:outline-none focus:ring-2 focus:ring-ring", offlineDrill ? "border-warning bg-warning/10" : "border-border bg-surface/70")}>
+                    <CloudOff className="mb-2 h-5 w-5 text-warning" />
+                    <p className="font-display text-lg font-semibold">Offline failure drills</p>
+                    <p className="text-sm text-muted-foreground">Simulates internet loss and verifies SMS, call loop, and mesh fallback escalation.</p>
+                  </button>
                 </div>
               </Panel>
             </section>
@@ -296,13 +369,52 @@ const Index = () => {
                 </div>
               </Panel>
 
-              <Panel title="Acknowledgments" icon={BadgeCheck}>
+              <Panel title="Acknowledgment Simulator" icon={BadgeCheck}>
+                <div className="mb-3 grid grid-cols-4 gap-1 rounded-lg border border-border bg-surface/70 p-1 text-xs">
+                  {(["App", "SMS", "Call", "Mesh"] as Channel[]).map((channel, index) => (
+                    <div key={channel} className={cn("rounded-md px-2 py-1 text-center", ackRound > index ? "bg-primary text-primary-foreground" : "bg-surface-strong text-muted-foreground")}>{channel}</div>
+                  ))}
+                </div>
                 <div className="space-y-2">
-                  {acked.map((person) => (
-                    <div key={person} className="flex items-center justify-between rounded-md bg-surface-strong/70 p-2 text-sm">
-                      <span>{person}</span><CheckCircle2 className="h-4 w-4 text-success" />
+                  {recipients.map((person) => {
+                    const confirmed = acked.includes(person.name);
+                    const failed = person.status === "failed" && !confirmed;
+                    return (
+                      <div key={person.name} className="rounded-md border border-border bg-surface-strong/70 p-2 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{person.name}</span>
+                          {confirmed ? <CheckCircle2 className="h-4 w-4 text-success" /> : failed ? <CloudOff className="h-4 w-4 text-danger" /> : <Clock3 className="h-4 w-4 text-warning" />}
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{person.role} • {confirmed ? "Confirmed" : failed ? "Failed" : "Retry pending"} via {person.channel}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <Button variant="console" size="sm" className="mt-3 w-full" onClick={acknowledgeAll}><Send /> Run acknowledge simulator</Button>
+              </Panel>
+
+              <Panel title="Incident Timeline" icon={Clock3}>
+                <div className="space-y-2">
+                  {timeline.map((event) => (
+                    <div key={event} className="flex gap-2 rounded-md bg-surface/70 p-2 text-sm">
+                      <CircleDot className="mt-1 h-3 w-3 shrink-0 text-primary" />
+                      <span>{event}</span>
                     </div>
                   ))}
+                </div>
+              </Panel>
+
+              <Panel title="Geozone Routing" icon={Route}>
+                <div className="space-y-2">
+                  {geozones.map((zone) => (
+                    <button key={zone.name} onClick={() => { setActiveGeozone(zone); setSystemMessage(`${zone.name} routing enabled: ${zone.route}.`); }} className={cn("w-full rounded-md border p-2 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-ring", activeGeozone.name === zone.name ? "border-primary bg-primary/10" : "border-border bg-surface/70 hover:border-primary/60")}>
+                      <span className="flex items-center gap-2 font-semibold"><LocateFixed className="h-4 w-4 text-accent" /> {zone.name}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">{zone.audience}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 rounded-md bg-surface-strong/70 p-3 text-sm">
+                  Route: {activeGeozone.route}<br />Blocked: {activeGeozone.blocked}
                 </div>
               </Panel>
 
