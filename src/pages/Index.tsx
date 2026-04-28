@@ -369,13 +369,52 @@ const Index = () => {
                 </div>
               </Panel>
 
-              <Panel title="Acknowledgments" icon={BadgeCheck}>
+              <Panel title="Acknowledgment Simulator" icon={BadgeCheck}>
+                <div className="mb-3 grid grid-cols-4 gap-1 rounded-lg border border-border bg-surface/70 p-1 text-xs">
+                  {(["App", "SMS", "Call", "Mesh"] as Channel[]).map((channel, index) => (
+                    <div key={channel} className={cn("rounded-md px-2 py-1 text-center", ackRound > index ? "bg-primary text-primary-foreground" : "bg-surface-strong text-muted-foreground")}>{channel}</div>
+                  ))}
+                </div>
                 <div className="space-y-2">
-                  {acked.map((person) => (
-                    <div key={person} className="flex items-center justify-between rounded-md bg-surface-strong/70 p-2 text-sm">
-                      <span>{person}</span><CheckCircle2 className="h-4 w-4 text-success" />
+                  {recipients.map((person) => {
+                    const confirmed = acked.includes(person.name);
+                    const failed = person.status === "failed" && !confirmed;
+                    return (
+                      <div key={person.name} className="rounded-md border border-border bg-surface-strong/70 p-2 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{person.name}</span>
+                          {confirmed ? <CheckCircle2 className="h-4 w-4 text-success" /> : failed ? <CloudOff className="h-4 w-4 text-danger" /> : <Clock3 className="h-4 w-4 text-warning" />}
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{person.role} • {confirmed ? "Confirmed" : failed ? "Failed" : "Retry pending"} via {person.channel}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <Button variant="console" size="sm" className="mt-3 w-full" onClick={acknowledgeAll}><Send /> Run acknowledge simulator</Button>
+              </Panel>
+
+              <Panel title="Incident Timeline" icon={Clock3}>
+                <div className="space-y-2">
+                  {timeline.map((event) => (
+                    <div key={event} className="flex gap-2 rounded-md bg-surface/70 p-2 text-sm">
+                      <CircleDot className="mt-1 h-3 w-3 shrink-0 text-primary" />
+                      <span>{event}</span>
                     </div>
                   ))}
+                </div>
+              </Panel>
+
+              <Panel title="Geozone Routing" icon={Route}>
+                <div className="space-y-2">
+                  {geozones.map((zone) => (
+                    <button key={zone.name} onClick={() => { setActiveGeozone(zone); setSystemMessage(`${zone.name} routing enabled: ${zone.route}.`); }} className={cn("w-full rounded-md border p-2 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-ring", activeGeozone.name === zone.name ? "border-primary bg-primary/10" : "border-border bg-surface/70 hover:border-primary/60")}>
+                      <span className="flex items-center gap-2 font-semibold"><LocateFixed className="h-4 w-4 text-accent" /> {zone.name}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">{zone.audience}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 rounded-md bg-surface-strong/70 p-3 text-sm">
+                  Route: {activeGeozone.route}<br />Blocked: {activeGeozone.blocked}
                 </div>
               </Panel>
 
