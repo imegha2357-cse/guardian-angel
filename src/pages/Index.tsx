@@ -61,6 +61,7 @@ type FailureModes = {
   smsUnavailable: boolean;
   meshLoss: number;
   delayedAcks: boolean;
+  ackDelaySeconds: number;
 };
 
 type DrillRun = {
@@ -73,6 +74,11 @@ type DrillRun = {
   smsUnavailable: boolean;
   meshLoss: number;
   delayedAcks: boolean;
+  ackDelaySeconds: number;
+  networkProfile: string;
+  evidenceCount: number;
+  notes: string;
+  exportValid: boolean;
 };
 
 const incidents = [
@@ -156,6 +162,12 @@ const staffRoster = [
 const roleFilters: RoleFilter[] = ["All", "Security", "Medical", "Warden", "Management", "Facilities", "Fire"];
 const drillFilters: DrillFilter[] = ["All", "Passed", "Degraded", "Failed"];
 
+const drillPresets = [
+  { name: "SMS outage", profile: "Congested", modes: { smsUnavailable: true, meshLoss: 12, delayedAcks: true, ackDelaySeconds: 45 } },
+  { name: "Mesh loss", profile: "Offline", modes: { smsUnavailable: false, meshLoss: 55, delayedAcks: true, ackDelaySeconds: 70 } },
+  { name: "Slow acks", profile: "Normal", modes: { smsUnavailable: false, meshLoss: 18, delayedAcks: true, ackDelaySeconds: 90 } },
+];
+
 const architecture = [
   ["MVP Live", "Sensor confidence scoring", "Working"],
   ["MVP Live", "Multi-channel verification", "Working"],
@@ -191,10 +203,11 @@ const Index = () => {
   const [timelineIndex, setTimelineIndex] = useState(3);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("All");
   const [drillFilter, setDrillFilter] = useState<DrillFilter>("All");
-  const [failureModes, setFailureModes] = useState<FailureModes>({ smsUnavailable: false, meshLoss: 12, delayedAcks: false });
+  const [failureModes, setFailureModes] = useState<FailureModes>({ smsUnavailable: false, meshLoss: 12, delayedAcks: false, ackDelaySeconds: 0 });
   const [networkProfile, setNetworkProfile] = useState("Normal");
   const [drillRuns, setDrillRuns] = useState<DrillRun[]>([]);
   const [screenshots, setScreenshots] = useState<string[]>([]);
+  const [evidenceNotes, setEvidenceNotes] = useState("");
   const [systemMessage, setSystemMessage] = useState("Hybrid communications stable. AI rules fallback armed.");
 
   const confidence = useMemo(() => Math.round(selectedIncident.confidence * 100), [selectedIncident]);
@@ -221,7 +234,7 @@ const Index = () => {
       { label: "Unresolved failures", value: `${failed + pending}`, state: failed + pending === 0 ? "success" : "danger" },
       { label: "SMS availability", value: failureModes.smsUnavailable ? "Blocked" : "Ready", state: failureModes.smsUnavailable ? "danger" : "success" },
       { label: "Mesh delivery", value: `${100 - failureModes.meshLoss}%`, state: failureModes.meshLoss > 35 ? "danger" : failureModes.meshLoss > 15 ? "warning" : "success" },
-      { label: "Ack latency", value: failureModes.delayedAcks ? `+${delayedImpacted * 20}s` : "Nominal", state: failureModes.delayedAcks ? "warning" : "success" },
+      { label: "Ack latency", value: failureModes.delayedAcks ? `+${failureModes.ackDelaySeconds || delayedImpacted * 20}s` : "Nominal", state: failureModes.delayedAcks ? "warning" : "success" },
     ];
   }, [ackRound, acked, failureModes, offlineDrill]);
   const filteredDrillRuns = useMemo(() => drillRuns.filter((run) => drillFilter === "All" || run.outcome === drillFilter), [drillFilter, drillRuns]);
@@ -252,8 +265,24 @@ const Index = () => {
 
   const acknowledgeRecipient = (person: string) => {
     setAcked((current) => current.includes(person) ? current.filter((item) => item !== person) : [...current, person]);
-    setTimeline((current) => [`ACK ${person} status updated`, ...current].slice(0, 8));
+    const delay = failureModes.delayedAcks ? ` delayed +${failureModes.ackDelaySeconds}s` : "";
+    setTimeline((current) => [`ACK ${person} status updated${delay}`, ...current].slice(0, 8));
     setTimelineIndex((current) => Math.min(current + 1, 8));
+  };
+
+  const applyPreset = (preset: typeof drillPresets[number]) => {
+    setFailureModes(preset.modes);
+    setNetworkProfile(preset.profile);
+    setTimeline((current) => [`PRESET ${preset.name}: ${preset.profile}, ${preset.modes.meshLoss}% mesh loss`, ...current].slice(0, 8));
+    setSystemMessage(`${preset.name} preset loaded for offline drill simulation.`);
+  };
+
+  const addDelayTimeline = () => {
+    const delay = failureModes.delayedAcks ? failureModes.ackDelaySeconds : 30;
+    setFailureModes((current) => ({ ...current, delayedAcks: true, ackDelaySeconds: delay }));
+    setTimeline((current) => [`T+${delay}s delayed acknowledgment window injected`, ...current].slice(0, 8));
+    setTimelineIndex((current) => Math.min(current + 1, 8));
+    setSystemMessage(`Timeline delay injected: acknowledgments now lag by ${delay} seconds.`);
   };
 
   const captureScreenshot = () => {
@@ -267,6 +296,7 @@ const Index = () => {
     const confirmed = recipients.filter((person) => acked.includes(person.name)).length;
     const unresolved = recipients.length - confirmed + (failureModes.smsUnavailable ? 1 : 0) + (failureModes.meshLoss > 40 ? 1 : 0);
     const outcome: DrillOutcome = unresolved === 0 ? "Passed" : unresolved <= 2 ? "Degraded" : "Failed";
+    const exportValid = screenshots.length > 0 && timeline.length > 0 && recipients.length > 0;
     const run: DrillRun = {
       id: `RUN-${String(drillRuns.length + 1).padStart(2, "0")}`,
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
@@ -277,6 +307,11 @@ const Index = () => {
       smsUnavailable: failureModes.smsUnavailable,
       meshLoss: failureModes.meshLoss,
       delayedAcks: failureModes.delayedAcks,
+      ackDelaySeconds: failureModes.ackDelaySeconds,
+      networkProfile,
+      evidenceCount: screenshots.length,
+      notes: evidenceNotes,
+      exportValid,
     };
     setDrillRuns((current) => [run, ...current].slice(0, 6));
     setTimeline((current) => [`${run.id} saved as ${outcome}: ${unresolved} unresolved`, ...current].slice(0, 8));
@@ -284,8 +319,8 @@ const Index = () => {
   };
 
   const exportCsv = () => {
-    const header = ["Run", "Time", "Outcome", "Confirmed", "Unresolved", "FallbackReach", "SMSUnavailable", "MeshLoss", "DelayedAcks"];
-    const body = drillRuns.map((run) => [run.id, run.time, run.outcome, run.confirmed, run.unresolved, run.fallbackReach, run.smsUnavailable, run.meshLoss, run.delayedAcks].join(","));
+    const header = ["Run", "Time", "Outcome", "Confirmed", "Unresolved", "FallbackReach", "Network", "SMSUnavailable", "MeshLoss", "DelayedAcks", "AckDelaySeconds", "EvidenceCount", "ExportValid", "Notes"];
+    const body = drillRuns.map((run) => [run.id, run.time, run.outcome, run.confirmed, run.unresolved, run.fallbackReach, run.networkProfile, run.smsUnavailable, run.meshLoss, run.delayedAcks, run.ackDelaySeconds, run.evidenceCount, run.exportValid, `"${run.notes.replace(/"/g, '""')}"`].join(","));
     const csv = [header.join(","), ...body].join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
@@ -296,9 +331,15 @@ const Index = () => {
     setSystemMessage("CSV export downloaded with saved drill run comparisons.");
   };
 
+  const validateExports = () => {
+    const invalid = drillRuns.filter((run) => !run.exportValid).length;
+    const columnsMatch = drillRuns.every((run) => typeof run.networkProfile === "string" && typeof run.evidenceCount === "number" && typeof run.exportValid === "boolean");
+    setSystemMessage(invalid === 0 && columnsMatch ? "Export consistency validated: saved runs include matching CSV/PDF fields and evidence metadata." : `Export validation flagged ${invalid} run(s) missing evidence or timeline metadata.`);
+  };
+
   const exportDrillReport = () => {
     const rows = recipients.map((person) => `${person.name} — ${person.role} — ${acked.includes(person.name) ? "confirmed" : person.status === "failed" ? "failed" : "pending"} via ${person.channel}`).join("<br />");
-    const modes = `Network: ${networkProfile}<br/>SMS unavailable: ${failureModes.smsUnavailable ? "Yes" : "No"}<br/>Mesh packet loss: ${failureModes.meshLoss}%<br/>Delayed acks: ${failureModes.delayedAcks ? "Yes" : "No"}<br/>Screenshots: ${screenshots.join(", ") || "None"}`;
+    const modes = `Network: ${networkProfile}<br/>SMS unavailable: ${failureModes.smsUnavailable ? "Yes" : "No"}<br/>Mesh packet loss: ${failureModes.meshLoss}%<br/>Delayed acks: ${failureModes.delayedAcks ? `Yes, +${failureModes.ackDelaySeconds}s` : "No"}<br/>Screenshots: ${screenshots.join(", ") || "None"}<br/>Notes: ${evidenceNotes || "None"}`;
     const report = window.open("", "_blank", "width=760,height=900");
     if (!report) return;
     report.document.write(`<html><head><title>CrisisNet Drill Report</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111827}h1{margin:0 0 8px}.meta{color:#4b5563;margin-bottom:24px}.card{border:1px solid #d1d5db;border-radius:8px;padding:14px;margin:12px 0}.ok{color:#047857}.warn{color:#b45309}.bad{color:#b91c1c}@media print{button{display:none}}</style></head><body><h1>CrisisNet Offline Drill Report</h1><div class="meta">${selectedIncident.id} • ${selectedIncident.zone} • ${new Date().toLocaleString()}</div><h2>Results</h2>${drillResults.map((item) => `<div class="card"><strong>${item.label}</strong><br/><span class="${item.state === "success" ? "ok" : item.state === "danger" ? "bad" : "warn"}">${item.value}</span></div>`).join("")}<h2>Failure modes + evidence</h2><div class="card">${modes}</div><h2>Recipient acknowledgments</h2><div class="card">${rows}</div><h2>Timeline</h2><div class="card">${timeline.join("<br />")}</div><button onclick="window.print()">Export as PDF</button><script>setTimeout(() => window.print(), 300)</script></body></html>`);
@@ -526,9 +567,19 @@ const Index = () => {
                     <span>Delayed acknowledgments</span>
                     <Switch checked={failureModes.delayedAcks} onCheckedChange={(checked) => setFailureModes((current) => ({ ...current, delayedAcks: checked }))} />
                   </div>
+                  <div className="rounded-md border border-border bg-surface/70 p-3">
+                    <div className="mb-2 flex justify-between"><span>Ack delay timeline</span><span>{failureModes.ackDelaySeconds}s</span></div>
+                    <input aria-label="Acknowledgment delay seconds" type="range" min="0" max="120" step="5" value={failureModes.ackDelaySeconds} onChange={(event) => setFailureModes((current) => ({ ...current, ackDelaySeconds: Number(event.target.value), delayedAcks: Number(event.target.value) > 0 }))} className="w-full accent-primary" />
+                    <Button variant="console" size="sm" className="mt-2 h-8 w-full text-xs" onClick={addDelayTimeline}><Clock3 /> Add delay event</Button>
+                  </div>
                   <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-surface/70 p-1 text-xs">
                     {["Normal", "Congested", "Offline"].map((profile) => (
                       <button key={profile} onClick={() => setNetworkProfile(profile)} className={cn("rounded-md px-2 py-1", networkProfile === profile ? "bg-primary text-primary-foreground" : "bg-surface-strong text-muted-foreground")}>{profile}</button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 rounded-lg border border-border bg-surface/70 p-1 text-xs">
+                    {drillPresets.map((preset) => (
+                      <button key={preset.name} onClick={() => applyPreset(preset)} className="rounded-md bg-surface-strong px-2 py-1 text-muted-foreground hover:bg-primary hover:text-primary-foreground">{preset.name}</button>
                     ))}
                   </div>
                 </div>
@@ -576,6 +627,8 @@ const Index = () => {
                   <Button variant="command" size="sm" onClick={exportDrillReport}><FileDown /> PDF report</Button>
                   <Button variant="console" size="sm" onClick={exportCsv} disabled={!drillRuns.length}><FileDown /> CSV export</Button>
                 </div>
+                <textarea aria-label="Evidence upload notes" value={evidenceNotes} onChange={(event) => setEvidenceNotes(event.target.value)} placeholder="Evidence notes" className="mt-3 min-h-16 w-full rounded-md border border-border bg-surface/70 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                <Button variant="console" size="sm" className="mt-2 w-full" onClick={validateExports}>Validate export consistency</Button>
                 <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
                   <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
                   {drillFilters.map((item) => (
@@ -585,10 +638,15 @@ const Index = () => {
                   ))}
                 </div>
                 <div className="mt-2 space-y-2">
+                  {filteredDrillRuns.length > 1 && (
+                    <div className="rounded-md border border-primary/30 bg-primary/10 p-2 text-xs text-primary">
+                      Compare: {filteredDrillRuns[0].id} vs {filteredDrillRuns[1].id} • unresolved Δ {filteredDrillRuns[0].unresolved - filteredDrillRuns[1].unresolved} • delay Δ {filteredDrillRuns[0].ackDelaySeconds - filteredDrillRuns[1].ackDelaySeconds}s
+                    </div>
+                  )}
                   {filteredDrillRuns.map((run) => (
                     <div key={run.id} className="rounded-md border border-border bg-surface/70 p-2 text-xs">
                       <div className="flex justify-between font-semibold"><span>{run.id} • {run.time}</span><span className={cn(run.outcome === "Passed" && "text-success", run.outcome === "Degraded" && "text-warning", run.outcome === "Failed" && "text-danger")}>{run.outcome}</span></div>
-                      <p className="mt-1 text-muted-foreground">Ack {run.confirmed}/{recipients.length} • unresolved {run.unresolved} • mesh loss {run.meshLoss}%</p>
+                      <p className="mt-1 text-muted-foreground">Ack {run.confirmed}/{recipients.length} • unresolved {run.unresolved} • {run.networkProfile} • delay {run.ackDelaySeconds}s • evidence {run.evidenceCount}</p>
                     </div>
                   ))}
                   {!filteredDrillRuns.length && <p className="rounded-md bg-surface/70 p-2 text-xs text-muted-foreground">No saved runs match this filter.</p>}
