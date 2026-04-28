@@ -256,11 +256,52 @@ const Index = () => {
     setTimelineIndex((current) => Math.min(current + 1, 8));
   };
 
+  const captureScreenshot = () => {
+    const stamp = `CAP-${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+    setScreenshots((current) => [stamp, ...current].slice(0, 4));
+    setTimeline((current) => [`${stamp} dashboard evidence captured`, ...current].slice(0, 8));
+    setSystemMessage("Dashboard screenshot marker captured for the drill report evidence log.");
+  };
+
+  const saveDrillRun = () => {
+    const confirmed = recipients.filter((person) => acked.includes(person.name)).length;
+    const unresolved = recipients.length - confirmed + (failureModes.smsUnavailable ? 1 : 0) + (failureModes.meshLoss > 40 ? 1 : 0);
+    const outcome: DrillOutcome = unresolved === 0 ? "Passed" : unresolved <= 2 ? "Degraded" : "Failed";
+    const run: DrillRun = {
+      id: `RUN-${String(drillRuns.length + 1).padStart(2, "0")}`,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      outcome,
+      confirmed,
+      unresolved,
+      fallbackReach: Math.min(ackRound, 4),
+      smsUnavailable: failureModes.smsUnavailable,
+      meshLoss: failureModes.meshLoss,
+      delayedAcks: failureModes.delayedAcks,
+    };
+    setDrillRuns((current) => [run, ...current].slice(0, 6));
+    setTimeline((current) => [`${run.id} saved as ${outcome}: ${unresolved} unresolved`, ...current].slice(0, 8));
+    setSystemMessage(`${run.id} saved. Outcome: ${outcome}. Compare it against filtered drill runs.`);
+  };
+
+  const exportCsv = () => {
+    const header = ["Run", "Time", "Outcome", "Confirmed", "Unresolved", "FallbackReach", "SMSUnavailable", "MeshLoss", "DelayedAcks"];
+    const body = drillRuns.map((run) => [run.id, run.time, run.outcome, run.confirmed, run.unresolved, run.fallbackReach, run.smsUnavailable, run.meshLoss, run.delayedAcks].join(","));
+    const csv = [header.join(","), ...body].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "crisisnet-drill-runs.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+    setSystemMessage("CSV export downloaded with saved drill run comparisons.");
+  };
+
   const exportDrillReport = () => {
     const rows = recipients.map((person) => `${person.name} — ${person.role} — ${acked.includes(person.name) ? "confirmed" : person.status === "failed" ? "failed" : "pending"} via ${person.channel}`).join("<br />");
+    const modes = `Network: ${networkProfile}<br/>SMS unavailable: ${failureModes.smsUnavailable ? "Yes" : "No"}<br/>Mesh packet loss: ${failureModes.meshLoss}%<br/>Delayed acks: ${failureModes.delayedAcks ? "Yes" : "No"}<br/>Screenshots: ${screenshots.join(", ") || "None"}`;
     const report = window.open("", "_blank", "width=760,height=900");
     if (!report) return;
-    report.document.write(`<html><head><title>CrisisNet Drill Report</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111827}h1{margin:0 0 8px}.meta{color:#4b5563;margin-bottom:24px}.card{border:1px solid #d1d5db;border-radius:8px;padding:14px;margin:12px 0}.ok{color:#047857}.warn{color:#b45309}.bad{color:#b91c1c}@media print{button{display:none}}</style></head><body><h1>CrisisNet Offline Drill Report</h1><div class="meta">${selectedIncident.id} • ${selectedIncident.zone} • ${new Date().toLocaleString()}</div><h2>Results</h2>${drillResults.map((item) => `<div class="card"><strong>${item.label}</strong><br/><span class="${item.state === "success" ? "ok" : item.state === "danger" ? "bad" : "warn"}">${item.value}</span></div>`).join("")}<h2>Recipient acknowledgments</h2><div class="card">${rows}</div><h2>Timeline</h2><div class="card">${timeline.join("<br />")}</div><button onclick="window.print()">Export as PDF</button><script>setTimeout(() => window.print(), 300)</script></body></html>`);
+    report.document.write(`<html><head><title>CrisisNet Drill Report</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111827}h1{margin:0 0 8px}.meta{color:#4b5563;margin-bottom:24px}.card{border:1px solid #d1d5db;border-radius:8px;padding:14px;margin:12px 0}.ok{color:#047857}.warn{color:#b45309}.bad{color:#b91c1c}@media print{button{display:none}}</style></head><body><h1>CrisisNet Offline Drill Report</h1><div class="meta">${selectedIncident.id} • ${selectedIncident.zone} • ${new Date().toLocaleString()}</div><h2>Results</h2>${drillResults.map((item) => `<div class="card"><strong>${item.label}</strong><br/><span class="${item.state === "success" ? "ok" : item.state === "danger" ? "bad" : "warn"}">${item.value}</span></div>`).join("")}<h2>Failure modes + evidence</h2><div class="card">${modes}</div><h2>Recipient acknowledgments</h2><div class="card">${rows}</div><h2>Timeline</h2><div class="card">${timeline.join("<br />")}</div><button onclick="window.print()">Export as PDF</button><script>setTimeout(() => window.print(), 300)</script></body></html>`);
     report.document.close();
     setSystemMessage("Drill report prepared in a print-ready PDF export window.");
   };
