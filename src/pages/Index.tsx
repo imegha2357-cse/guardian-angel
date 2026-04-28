@@ -16,6 +16,7 @@ import {
   Filter,
   Flame,
   Gauge,
+  ImageDown,
   LocateFixed,
   MessageCircle,
   type LucideIcon,
@@ -32,6 +33,7 @@ import {
   ShieldCheck,
   Siren,
   Smartphone,
+  SlidersHorizontal,
   UserCheck,
   Users,
   Volume2,
@@ -52,6 +54,26 @@ type AckStatus = "confirmed" | "failed" | "pending";
 type Channel = "App" | "SMS" | "Call" | "Mesh";
 type StaffRole = Role | "Warden" | "External" | "Facilities" | "Fire";
 type RoleFilter = StaffRole | "All";
+type DrillOutcome = "Passed" | "Degraded" | "Failed";
+type DrillFilter = DrillOutcome | "All";
+
+type FailureModes = {
+  smsUnavailable: boolean;
+  meshLoss: number;
+  delayedAcks: boolean;
+};
+
+type DrillRun = {
+  id: string;
+  time: string;
+  outcome: DrillOutcome;
+  confirmed: number;
+  unresolved: number;
+  fallbackReach: number;
+  smsUnavailable: boolean;
+  meshLoss: number;
+  delayedAcks: boolean;
+};
 
 const incidents = [
   {
@@ -132,6 +154,7 @@ const staffRoster = [
 ];
 
 const roleFilters: RoleFilter[] = ["All", "Security", "Medical", "Warden", "Management", "Facilities", "Fire"];
+const drillFilters: DrillFilter[] = ["All", "Passed", "Degraded", "Failed"];
 
 const architecture = [
   ["MVP Live", "Sensor confidence scoring", "Working"],
