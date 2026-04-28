@@ -61,6 +61,7 @@ type FailureModes = {
   smsUnavailable: boolean;
   meshLoss: number;
   delayedAcks: boolean;
+  ackDelaySeconds: number;
 };
 
 type DrillRun = {
@@ -73,6 +74,11 @@ type DrillRun = {
   smsUnavailable: boolean;
   meshLoss: number;
   delayedAcks: boolean;
+  ackDelaySeconds: number;
+  networkProfile: string;
+  evidenceCount: number;
+  notes: string;
+  exportValid: boolean;
 };
 
 const incidents = [
@@ -155,6 +161,12 @@ const staffRoster = [
 
 const roleFilters: RoleFilter[] = ["All", "Security", "Medical", "Warden", "Management", "Facilities", "Fire"];
 const drillFilters: DrillFilter[] = ["All", "Passed", "Degraded", "Failed"];
+
+const drillPresets = [
+  { name: "SMS outage", profile: "Congested", modes: { smsUnavailable: true, meshLoss: 12, delayedAcks: true, ackDelaySeconds: 45 } },
+  { name: "Mesh loss", profile: "Offline", modes: { smsUnavailable: false, meshLoss: 55, delayedAcks: true, ackDelaySeconds: 70 } },
+  { name: "Slow acks", profile: "Normal", modes: { smsUnavailable: false, meshLoss: 18, delayedAcks: true, ackDelaySeconds: 90 } },
+];
 
 const architecture = [
   ["MVP Live", "Sensor confidence scoring", "Working"],
