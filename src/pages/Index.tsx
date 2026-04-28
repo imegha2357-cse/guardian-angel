@@ -230,7 +230,7 @@ const Index = () => {
                         {zone.name}
                       </button>
                     ))}
-                    <div className="absolute left-8 top-8 rounded-lg border border-border bg-background/85 p-3 backdrop-blur">
+                    <div className="absolute left-8 top-8 rounded-lg border border-border bg-background/90 p-3 backdrop-blur">
                       <p className="text-xs uppercase text-muted-foreground">Dynamic route</p>
                       <p className="font-display text-xl font-semibold">Avoid Atrium → Stairwell B</p>
                     </div>
@@ -333,7 +333,7 @@ const Index = () => {
 };
 
 const Panel = ({ title, icon: Icon, className, children }: { title: string; icon: LucideIcon; className?: string; children: ReactNode }) => (
-  <section className={cn("rounded-xl border border-border bg-card/78 p-4 shadow-command backdrop-blur-xl", className)}>
+  <section className={cn("rounded-xl border border-border bg-card/80 p-4 shadow-command backdrop-blur-xl", className)}>
     <div className="mb-4 flex items-center gap-2">
       <span className="rounded-md bg-primary/10 p-2 text-primary"><Icon className="h-4 w-4" /></span>
       <h2 className="font-display text-lg font-semibold">{title}</h2>
