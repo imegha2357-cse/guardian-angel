@@ -347,6 +347,15 @@ const Index = () => {
                         {zone.name}
                       </button>
                     ))}
+                    <div className="absolute bottom-6 left-6 w-56 rounded-lg border border-border bg-background/90 p-3 backdrop-blur">
+                      <p className="mb-2 text-xs uppercase text-muted-foreground">Zone coverage</p>
+                      {zones.map((zone) => (
+                        <div key={zone.name} className="mb-2 last:mb-0">
+                          <div className="flex justify-between text-xs"><span>{zone.name}</span><span>{zone.coverage}% • {zone.devices}</span></div>
+                          <Progress value={zone.coverage} className="mt-1 h-1.5" />
+                        </div>
+                      ))}
+                    </div>
                     <div className="absolute left-8 top-8 rounded-lg border border-border bg-background/90 p-3 backdrop-blur">
                       <p className="text-xs uppercase text-muted-foreground">Dynamic route</p>
                       <p className="font-display text-xl font-semibold">Avoid Atrium → Stairwell B</p>
@@ -437,6 +446,9 @@ const Index = () => {
                           {confirmed ? <CheckCircle2 className="h-4 w-4 text-success" /> : failed ? <CloudOff className="h-4 w-4 text-danger" /> : <Clock3 className="h-4 w-4 text-warning" />}
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">{person.role} • {confirmed ? "Confirmed" : failed ? "Failed" : "Retry pending"} via {person.channel}</p>
+                        <Button variant={confirmed ? "command" : "console"} size="sm" className="mt-2 h-8 w-full text-xs" onClick={() => acknowledgeRecipient(person.name)}>
+                          {confirmed ? "Reopen ack" : "Acknowledge recipient"}
+                        </Button>
                       </div>
                     );
                   })}
@@ -444,9 +456,30 @@ const Index = () => {
                 <Button variant="console" size="sm" className="mt-3 w-full" onClick={acknowledgeAll}><Send /> Run acknowledge simulator</Button>
               </Panel>
 
+              <Panel title="Drill Results" icon={FileDown}>
+                <div className="grid grid-cols-2 gap-2">
+                  {drillResults.map((item) => (
+                    <div key={item.label} className="rounded-md border border-border bg-surface-strong/70 p-2">
+                      <p className="text-xs text-muted-foreground">{item.label}</p>
+                      <p className={cn("font-display text-lg font-semibold", item.state === "success" && "text-success", item.state === "warning" && "text-warning", item.state === "danger" && "text-danger")}>{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="command" size="sm" className="mt-3 w-full" onClick={exportDrillReport}><FileDown /> Export PDF report</Button>
+              </Panel>
+
               <Panel title="Incident Timeline" icon={Clock3}>
+                <input
+                  aria-label="Timeline scrubber"
+                  type="range"
+                  min="1"
+                  max={timeline.length}
+                  value={timelineIndex}
+                  onChange={(event) => setTimelineIndex(Number(event.target.value))}
+                  className="mb-3 w-full accent-primary"
+                />
                 <div className="space-y-2">
-                  {timeline.map((event) => (
+                  {visibleTimeline.map((event) => (
                     <div key={event} className="flex gap-2 rounded-md bg-surface/70 p-2 text-sm">
                       <CircleDot className="mt-1 h-3 w-3 shrink-0 text-primary" />
                       <span>{event}</span>
